@@ -6,12 +6,25 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "The MentalPitch",
   slug: "the-mental-pitch",
-  version: "1.1.2",
+  version: "1.1.6",
   orientation: "portrait",
   scheme: "thementalpitch",
   platforms: ["ios", "android", "web"],
-  icon: "./assets/images/app_logo.png",
-  plugins: ["expo-router"],
+  icon: "./assets/images/mental_pitch_logo.png",
+  plugins: [
+    "expo-router",
+    "expo-notifications",
+    "expo-font",
+    [
+      "expo-speech-recognition",
+      {
+        microphonePermission:
+          "Allow The MentalPitch to use your microphone for spoken journal answers.",
+        speechRecognitionPermission:
+          "Allow The MentalPitch to turn spoken journal answers into text.",
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true
   },
@@ -21,14 +34,20 @@ const config: ExpoConfig = {
     supportsTablet: true,
     requireFullScreen: false,
     infoPlist: {
-      ITSAppUsesNonExemptEncryption: false
+      ITSAppUsesNonExemptEncryption: false,
+      NSMicrophoneUsageDescription:
+        "Allow The MentalPitch to use your microphone for spoken journal answers.",
+      NSSpeechRecognitionUsageDescription:
+        "Allow The MentalPitch to turn spoken journal answers into text.",
+      NSPhotoLibraryUsageDescription:
+        "Allow The MentalPitch to access photos you choose to share with the app."
     }
   },
   android: {
     package: "com.mentalpitch.app",
     versionCode: 1,
     adaptiveIcon: {
-      foregroundImage: "./assets/images/app_logo.png",
+      foregroundImage: "./assets/images/mental_pitch_logo.png",
       backgroundColor: "#ffffff",
     },
   },
@@ -43,4 +62,3 @@ const config: ExpoConfig = {
 };
 
 export default config;
-

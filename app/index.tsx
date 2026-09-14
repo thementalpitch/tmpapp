@@ -1,231 +1,101 @@
-import { View, StyleSheet, Text, TouchableOpacity, Animated } from "react-native";
+import { View, StyleSheet, Text, Animated, Image, ScrollView } from "react-native";
 import React, { useEffect, useRef } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { AppButton, ListGroup, ListRow } from "../src/components/AppChrome";
 import { LoadingScreen } from "../src/components/LoadingScreen";
 import { AuthScreen } from "../src/components/AuthScreen";
 import { useAuth } from "../src/contexts/AuthContext";
+import { colors, font, layout } from "../src/theme";
+import { openOnrise } from "../src/utils/onrise";
+
+const LOGO_SIZE = 132;
+
+const menuItems: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; path: Href }[] = [
+  { label: "Stats", icon: "bar-chart-outline", path: "/stats" },
+  { label: "Calendar", icon: "calendar-outline", path: "/calendar" },
+  { label: "Profile", icon: "person-outline", path: "/profile" },
+  { label: "Settings", icon: "settings-outline", path: "/settings" },
+];
 
 export default function Index() {
   const { user, loading } = useAuth();
   const router = useRouter();
-
-  const logoScale = useRef(new Animated.Value(0.9)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const stackOpacity = useRef(new Animated.Value(0)).current;
-  const stackTranslateY = useRef(new Animated.Value(24)).current;
-  const journalPulse = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (loading) return;
+    Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  }, [loading, fade]);
 
-    Animated.parallel([
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 450,
-        useNativeDriver: true,
-      }),
-      Animated.spring(logoScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(stackOpacity, {
-        toValue: 1,
-        delay: 150,
-        duration: 350,
-        useNativeDriver: true,
-      }),
-      Animated.timing(stackTranslateY, {
-        toValue: 0,
-        delay: 150,
-        duration: 350,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  if (loading) return <LoadingScreen message="Checking authentication..." />;
+  if (!user) return <AuthScreen />;
 
-    // Idle pulsing for primary CTA
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(journalPulse, {
-          toValue: 1,
-          duration: 2200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(journalPulse, {
-          toValue: 0,
-          duration: 2200,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [loading, logoOpacity, logoScale, stackOpacity, stackTranslateY, journalPulse]);
-
-  // Show loading screen while checking auth state
-  if (loading) {
-    return <LoadingScreen message="Checking authentication..." />;
-  }
-
-  // Show auth screen if not authenticated
-  if (!user) {
-    return <AuthScreen />;
-  }
-
-  // Show main app content if authenticated
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.stack,
-          { opacity: stackOpacity, transform: [{ translateY: stackTranslateY }] },
-        ]}
+    <View style={layout.page}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Animated.Image
-          source={require("../assets/images/app_logo.png")}
-          style={[styles.appLogo, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}
-          resizeMode="contain"
-        />
+        <Animated.View style={[styles.content, { opacity: fade }]}>
+          <View style={styles.hero}>
+            <Animated.Image
+              source={require("../assets/images/mental_pitch_logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.tagline}>Log preparation and reflection around every session.</Text>
+          </View>
 
-        <View style={styles.lowerSection}>
-          <Animated.View
-            style={{
-              transform: [
-                {
-                  scale: journalPulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.04],
-                  }),
-                },
-              ],
-            }}
-          >
-            <TouchableOpacity
-              style={styles.journalButton}
-              onPress={() => router.push("/journal")}
-            >
-              <Text style={styles.journalButtonText}>Your Journal</Text>
-            </TouchableOpacity>
-          </Animated.View>
+          <AppButton label="Your Journal" icon="book-outline" onPress={() => router.push("/journal")} />
 
-          <TouchableOpacity
-            style={styles.statsButton}
-            onPress={() => router.push("/stats")}
-          >
-            <Text style={styles.statsButtonText}>Your Stats</Text>
-          </TouchableOpacity>
+          <ListGroup>
+            {menuItems.map((item, index) => (
+              <ListRow
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                onPress={() => router.push(item.path)}
+                border={index < menuItems.length - 1}
+              />
+            ))}
+          </ListGroup>
 
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push("/profile")}
-          >
-            <Text style={styles.profileButtonText}>Profile</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => router.push("/settings")}
-          >
-            <Text style={styles.settingsButtonText}>Settings</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
+          <View style={styles.onriseSection}>
+            <Image
+              source={require("../assets/images/company_logo.png")}
+              style={styles.onriseLogo}
+              resizeMode="contain"
+              accessibilityLabel="Onrise"
+            />
+            <AppButton
+              label="Book with Onrise"
+              icon="open-outline"
+              variant="secondary"
+              onPress={openOnrise}
+            />
+          </View>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#e5e7eb",
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: "center", paddingBottom: 40 },
+  content: { gap: 24 },
+  hero: { alignItems: "center", gap: 12, marginBottom: 4 },
+  logo: { width: LOGO_SIZE, height: LOGO_SIZE },
+  tagline: {
+    fontFamily: font,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.muted,
+    textAlign: "center",
+    maxWidth: 280,
   },
-  stack: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  appLogo: {
-    width: 280,
-    height: 280,
-  },
-  lowerSection: {
-    marginTop: 28,
-    width: "100%",
-    alignItems: "center",
-    gap: 22,
-  },
-  journalButton: {
-    backgroundColor: "#3b82f6",
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    alignItems: "center",
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.26,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  journalButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#ffffff",
-    letterSpacing: 0.5,
-  },
-  statsButton: {
-    backgroundColor: "#ffffff",
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  statsButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1d4ed8",
-    letterSpacing: 0.5,
-  },
-  profileButton: {
-    backgroundColor: "#ffffff",
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  profileButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1d4ed8",
-    letterSpacing: 0.5,
-  },
-  settingsButton: {
-    backgroundColor: "#ffffff",
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-  },
-  settingsButtonText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#1d4ed8",
-    letterSpacing: 0.3,
-  },
+  onriseSection: { alignItems: "center", gap: 12, paddingTop: 4 },
+  onriseLogo: { width: 132, height: 58 },
 });

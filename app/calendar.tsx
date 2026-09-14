@@ -10,8 +10,22 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { getDailyMoodAveragesForMonth, type DailyMoodAverage } from "../src/api";
+import { Page, PageHeader } from "../src/components/AppChrome";
+import { colors, radius } from "../src/theme";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function chunkWeeks(days: (number | null)[]): (number | null)[][] {
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    const week = days.slice(i, i + 7);
+    while (week.length < 7) {
+      week.push(null);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -22,28 +36,23 @@ function getFirstDayOfMonth(year: number, month: number): number {
 }
 
 function getMoodColor(averageMood: number | null): string {
-  if (averageMood === null) return "#1e293b"; // No data - dark gray
+  if (averageMood === null) return colors.surface;
 
-  // Smooth gradient from red (1) -> yellow (5) -> green (10)
-  // Red: rgb(220, 38, 38) at 1
-  // Yellow: rgb(234, 179, 8) at 5
-  // Green: rgb(34, 197, 94) at 10
+  // Dark mood-tinted fills keep white date text readable.
 
   if (averageMood >= 1 && averageMood <= 5) {
-    // Red to Yellow transition (1-5)
-    const t = (averageMood - 1) / 4; // 0 to 1
-    const r = Math.round(220 + (234 - 220) * t);
-    const g = Math.round(38 + (179 - 38) * t);
-    const b = Math.round(38 + (8 - 38) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  } else {
-    // Yellow to Green transition (5-10)
-    const t = (averageMood - 5) / 5; // 0 to 1
-    const r = Math.round(234 + (34 - 234) * t);
-    const g = Math.round(179 + (197 - 179) * t);
-    const b = Math.round(8 + (94 - 8) * t);
+    const t = (averageMood - 1) / 4;
+    const r = Math.round(127 + (133 - 127) * t);
+    const g = Math.round(29 + (77 - 29) * t);
+    const b = Math.round(29 + (14 - 29) * t);
     return `rgb(${r}, ${g}, ${b})`;
   }
+
+  const t = (averageMood - 5) / 5;
+  const r = Math.round(133 + (20 - 133) * t);
+  const g = Math.round(77 + (83 - 77) * t);
+  const b = Math.round(14 + (45 - 14) * t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export default function CalendarScreen() {
@@ -189,13 +198,16 @@ export default function CalendarScreen() {
     calendarDays.push(day);
   }
 
+  const calendarWeeks = chunkWeeks(calendarDays);
+
   const handleDayPress = (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     router.push(`/journal?date=${dateStr}`);
   };
 
   return (
-    <View style={styles.container}>
+    <Page>
+      <PageHeader title="Calendar" subtitle="Mood by day" onBack={() => router.back()} />
       <Animated.View
         style={[
           styles.headerRow,
@@ -218,7 +230,7 @@ export default function CalendarScreen() {
 
       {loading ? (
         <View style={styles.centerContent}>
-          <ActivityIndicator color="#38bdf8" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : error ? (
         <View style={styles.centerContent}>
@@ -260,109 +272,101 @@ export default function CalendarScreen() {
               ))}
             </Animated.View>
 
-            {/* Calendar grid */}
+            {/* Calendar grid — one flex row per week so all 7 columns always fit */}
             <View style={styles.calendarGrid}>
-              {calendarDays.map((day, index) => {
-                const animValue = dayAnimations[index] || new Animated.Value(1);
-                
-                if (day === null) {
-                  return (
-                    <Animated.View
-                      key={`empty-${index}`}
-                      style={[
-                        styles.dayCellWrapper,
-                        {
-                          opacity: animValue,
-                          transform: [
+              {calendarWeeks.map((week, weekIndex) => (
+                <View key={`week-${weekIndex}`} style={styles.weekRow}>
+                  {week.map((day, dayIndex) => {
+                    const index = weekIndex * 7 + dayIndex;
+                    const animValue = dayAnimations[index] || new Animated.Value(1);
+
+                    if (day === null) {
+                      return (
+                        <Animated.View
+                          key={`empty-${weekIndex}-${dayIndex}`}
+                          style={[
+                            styles.dayCellWrapper,
                             {
-                              scale: animValue.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [0.5, 1],
-                              }),
+                              opacity: animValue,
+                              transform: [
+                                {
+                                  scale: animValue.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.5, 1],
+                                  }),
+                                },
+                              ],
                             },
-                          ],
-                        },
-                      ]}
-                    >
-                      <View style={styles.dayCell} />
-                    </Animated.View>
-                  );
-                }
+                          ]}
+                        >
+                          <View style={[styles.dayCell, styles.emptyDayCell]} />
+                        </Animated.View>
+                      );
+                    }
 
-                const mood = getMoodForDate(day);
-                const color = getMoodColor(mood);
-                const now = new Date();
-                const isToday =
-                  day === now.getDate() &&
-                  month === now.getMonth() + 1 &&
-                  year === now.getFullYear();
+                    const mood = getMoodForDate(day);
+                    const color = getMoodColor(mood);
+                    const now = new Date();
+                    const isToday =
+                      day === now.getDate() &&
+                      month === now.getMonth() + 1 &&
+                      year === now.getFullYear();
 
-                return (
-                  <Animated.View
-                    key={day}
-                    style={[
-                      styles.dayCellWrapper,
-                      {
-                        opacity: animValue,
-                        transform: [
-                          {
-                            scale: animValue.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0.5, 1],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={[styles.dayCell, { backgroundColor: color }]}
-                      onPress={() => handleDayPress(day)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
+                    return (
+                      <Animated.View
+                        key={`${weekIndex}-${day}`}
                         style={[
-                          styles.dayText,
-                          isToday && styles.todayText,
-                          mood === null && styles.noDataText,
+                          styles.dayCellWrapper,
+                          {
+                            opacity: animValue,
+                            transform: [
+                              {
+                                scale: animValue.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0.5, 1],
+                                }),
+                              },
+                            ],
+                          },
                         ]}
                       >
-                        {day}
-                      </Text>
-                      {mood !== null && (
-                        <Text style={styles.moodIndicator}>
-                          {mood.toFixed(1)}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
+                        <TouchableOpacity
+                          style={[styles.dayCell, { backgroundColor: color }]}
+                          onPress={() => handleDayPress(day)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.dayText,
+                              isToday && styles.todayText,
+                              mood === null && styles.noDataText,
+                            ]}
+                          >
+                            {day}
+                          </Text>
+                          {mood !== null && (
+                            <Text style={styles.moodIndicator}>{mood.toFixed(1)}</Text>
+                          )}
+                        </TouchableOpacity>
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           </ScrollView>
         </Animated.View>
       )}
-    </View>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    paddingTop: 70,
-    paddingHorizontal: 24,
-  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 28,
-  },
-  backText: {
-    fontSize: 14,
-    color: "#38bdf8",
-    fontWeight: "600",
   },
   monthHeader: {
     flexDirection: "row",
@@ -372,22 +376,22 @@ const styles = StyleSheet.create({
   navButton: {
     width: 36,
     height: 36,
-    borderRadius: 999,
-    backgroundColor: "#0f172a",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#1e293b",
+    borderColor: colors.border,
   },
   navButtonText: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#e5e7eb",
+    fontSize: 22,
+    fontWeight: "600",
+    color: colors.text,
   },
   monthText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#e5e7eb",
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
     minWidth: 180,
     textAlign: "center",
   },
@@ -397,7 +401,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorText: {
-    color: "#f97373",
+    color: colors.danger,
     fontSize: 14,
   },
   scrollContent: {
@@ -407,6 +411,7 @@ const styles = StyleSheet.create({
   dayHeaders: {
     flexDirection: "row",
     marginBottom: 8,
+    gap: 6,
   },
   dayHeader: {
     flex: 1,
@@ -414,48 +419,53 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   dayHeaderText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
-    color: "#9ca3af",
-    textTransform: "uppercase",
+    color: colors.muted,
   },
   calendarGrid: {
+    width: "100%",
+    gap: 6,
+  },
+  weekRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    width: "100%",
+    gap: 6,
   },
   dayCellWrapper: {
-    width: `${100 / 7}%`,
-    paddingHorizontal: 3,
-    paddingVertical: 3,
+    flex: 1,
   },
   dayCell: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 16,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#1e293b",
-    backgroundColor: "#1e293b",
-    minHeight: 50,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  emptyDayCell: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
   dayText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#e5e7eb",
+    color: colors.text,
   },
   todayText: {
     fontWeight: "700",
-    fontSize: 16,
-    color: "#ffffff",
+    fontSize: 15,
+    color: colors.white,
   },
   noDataText: {
-    color: "#64748b",
+    color: colors.faint,
   },
   moodIndicator: {
     fontSize: 9,
     fontWeight: "500",
-    color: "#ffffff",
+    color: colors.white,
     marginTop: 2,
     opacity: 0.9,
   },

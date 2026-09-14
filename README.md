@@ -65,7 +65,17 @@ This document outlines all journal/workout entry types available in the Mental P
 **Journal page:** `TrainingJournal.tsx`  
 **LocalStorage key:** `trainingQuestions`
 
-### Default Questions
+Training journals have two phases. Questions 1-3 are completed before training, then the remaining questions are completed afterward.
+
+### Pre-training Questions
+
+| ID | Question | Enabled by Default |
+|----|----------|-------------------|
+| 1 | What aspect of my game do I want to focus on today? | ✅ Yes |
+| 2 | What could potentially distract me from staying focused? | ✅ Yes |
+| 3 | How will I refocus after getting distracted? | ✅ Yes |
+
+### Post-training Questions
 
 | ID | Question | Enabled by Default |
 |----|----------|-------------------|
@@ -92,11 +102,8 @@ This document outlines all journal/workout entry types available in the Mental P
 | ID | Question | Enabled by Default |
 |----|----------|-------------------|
 | 1 | How do I feel about my rehab performance today? | ✅ Yes |
-| 2 | What did I do when I first woke up to set a positive tone for my recovery? | ✅ Yes |
-| 3 | Did I get 20 minutes of stretching in today? If not, why? | ✅ Yes |
-| 4 | How motivated was I before rehab today? | ✅ Yes |
-| 5 | After rehab, do I feel better or worse about my recovery process? | ✅ Yes |
-| 6 | What did/am I going to do to stay connected with my teammates today? | ✅ Yes |
+| 2 | How motivated was I before rehab today? | ✅ Yes |
+| 3 | After rehab, do I feel better or worse about my recovery process? | ✅ Yes |
 
 
 
@@ -130,28 +137,29 @@ This document outlines all journal/workout entry types available in the Mental P
 **Journal page:** `GameJournal.tsx`  
 **LocalStorage key:** `gameQuestions`
 
-The Game journal is unique in that it has **two phases**: Pregame and Postgame. Each phase has its own set of questions.
+Game journals have **two phases**: Pregame and Postgame. Each phase has its own set of questions.
 
 ### Pregame Questions
 
 | ID | Question | Enabled by Default |
 |----|----------|-------------------|
-| 1 | What are three things I can control today that will help me perform my best? | ✅ Yes |
-| 2 | What external factors could distract me from playing my best? | ✅ Yes |
-| 3 | How will I respond to mistakes in a way that keeps me focused? | ✅ Yes |
+| 1 | Who is your opponent? | ✅ Yes |
+| 2 | What are three things I can control today that will help me perform my best? | ✅ Yes |
+| 3 | What external factors could distract me from playing my best? | ✅ Yes |
+| 4 | How will I respond to mistakes in a way that keeps me focused? | ✅ Yes |
 
 ### Postgame Questions
 
 | ID | Question | Enabled by Default |
 |----|----------|-------------------|
-| 4 | Was I fully engaged in the game? YES or NO | ✅ Yes |
-| 5 | Right now, how do I feel I played? | ✅ Yes |
-| 6 | What are three things I did well? | ✅ Yes |
-| 7 | What's one thing I want to work on based on today's game? | ✅ Yes |
-| 8 | Do I think how I played will affect the rest of my day? What if I played the opposite of how I played? | ✅ Yes |
-| 9 | How did I feel playing against the player I was matched up against? | ✅ Yes |
-| 10 | How did I feel in my team's system against the other team's system? | ✅ Yes |
-| 11 | How do I feel about my playing time today? If I don't feel great about it, how can I work with my coaches to change it, without disrespecting their decision? | ✅ Yes |
+| 1 | Was I fully engaged in the game? YES or NO | ✅ Yes |
+| 2 | Right now, how do I feel I played? | ✅ Yes |
+| 3 | What are three things I did well? | ✅ Yes |
+| 4 | What's one thing I want to work on based on today's game? | ✅ Yes |
+| 5 | Do I think how I played will affect the rest of my day? | ✅ Yes |
+| 6 | How did I feel playing against the player I was matched up against? | ✅ Yes |
+| 7 | How did I feel in my team's system against the other team's system? | ✅ Yes |
+| 8 | How do I feel about my playing time today? If I don't feel great about it, how can I work with my coaches to change it, without disrespecting their decision? | ✅ Yes |
 
 
 
@@ -216,10 +224,10 @@ The Imagery journal uses visualization prompts rather than questions. Users sele
 ## Summary Table
 
 | Type | Questions/Prompts | 
-| Training | 6 default questions | 
-| Rehab | 6 default questions | 
+| Training | 9 default questions (3 pre-training, 6 post-training) |
+| Rehab | 3 default questions |
 | Lift | 4 default questions | 
-| Game | 11 default questions | 
+| Game | 12 default questions (4 pregame, 8 postgame) |
 | Food | 4 data fields | 
 | Imagery | 10 default prompts | 
 
@@ -255,6 +263,7 @@ Below is a high-level summary of the tables (and types) added by the SQL migrati
     - `is_required boolean not null default false`
     - `sort_order integer not null default 100`
     - `is_system_default boolean not null default false`
+    - `retired_at timestamptz` — hides retired prompts while preserving historical answers.
     - `created_at timestamptz not null default now()`
 
 ### 3. Journal entry tables
@@ -269,6 +278,7 @@ Below is a high-level summary of the tables (and types) added by the SQL migrati
     - `title text`
     - `notes text`
     - `mood_score integer check (mood_score between 1 and 10)`
+    - `rpe_score integer check (rpe_score between 0 and 10)` — optional session effort; not used for calendar mood.
     - `created_at timestamptz not null default now()`
     - `updated_at timestamptz not null default now()`
   - **`public.journal_entry_answers`**
@@ -286,6 +296,10 @@ Below is a high-level summary of the tables (and types) added by the SQL migrati
 - **`007_add_v1_entry_and_questions.sql`**
   - Inserts V1 `workout_types`: `Training`, `Rehab`, `Lift`, `Game`, `Food`, `Imagery` (as system defaults).
   - Inserts all of the V1 `journal_questions` that match the sections above (Training, Rehab, Lift, Game pre/post, Imagery prompts).
+- **`013_add_training_pre_training_questions.sql`**
+  - Adds and phase-labels the three pre-training questions.
+- **`020_update_game_and_training_journals.sql`**
+  - Updates the opponent and postgame copy, and retires superseded postgame questions without deleting historical answers.
 
 ### 5. Food-specific tables
 

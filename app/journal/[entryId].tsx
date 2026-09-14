@@ -1,17 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
   Alert,
   Keyboard,
-  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import {
   getEntryWithAnswers,
   updateEntry,
@@ -19,14 +17,28 @@ import {
   getQuestionsByWorkoutType,
   createAnswers,
   deleteEntry,
+  getJournalAiInsight,
+  requestJournalAiInsight,
+  type JournalAiInsight,
   type JournalEntryWithAnswers,
   type JournalQuestion,
 } from "../../src/api";
 import { TimeInput } from "../../src/components/TimeInput";
-import { MoodScoreInput } from "../../src/components/MoodScoreInput";
+import { MoodScoreInput, RpeInput } from "../../src/components/MoodScoreInput";
 import { QuestionsSection } from "../../src/components/QuestionsSection";
+import { AppButton, BottomNav, ButtonRow, PageHeader } from "../../src/components/AppChrome";
+import { AiInsightCards } from "../../src/components/JournalAiInsight";
+import { colors, layout, space } from "../../src/theme";
+import { OtherNotes } from "../../src/components/OtherNotes";
 import { normalizeTime, validateMoodScore } from "../../src/utils/timeValidation";
 import { formatDateLocal } from "../../src/utils/date";
+import {
+  getPhaseLabels,
+  getPostQuestions,
+  getPreQuestions,
+  isPhasedJournalName,
+} from "../../src/utils/journalPhases";
+import { useKeyboardVisible } from "../../src/hooks/useKeyboardVisible";
 
 function formatEntryDate(dateStr: string): string {
   return formatDateLocal(dateStr, {
@@ -44,12 +56,53 @@ export default function JournalEntryDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<JournalEntryWithAnswers | null>(null);
+  const [aiInsight, setAiInsight] = useState<JournalAiInsight | null>(null);
   const [questions, setQuestions] = useState<JournalQuestion[]>([]);
   const [answerTexts, setAnswerTexts] = useState<Record<string, string>>({});
   const [moodScore, setMoodScore] = useState<string>("");
+  const [rpeScore, setRpeScore] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
   const [timeString, setTimeString] = useState<string>("");
   const [amPm, setAmPm] = useState<"AM" | "PM">("AM");
   const [deleting, setDeleting] = useState(false);
+  const isKeyboardVisible = useKeyboardVisible();
+  const isPhasedEntry = isPhasedJournalName(entry?.title);
+  const isFoodEntry = (entry?.title || "").toLowerCase().includes("food");
+  const isFinishingPhase = isPhasedEntry && entry?.mood_score == null;
+
+  const hasChanges = useMemo(() => {
+    if (!entry) return false;
+
+    const storedTime = entry.entry_time?.match(/(\d{2}):(\d{2})/);
+    const timeChanged =
+      !isFinishingPhase &&
+      !isFoodEntry &&
+      normalizeTime(timeString, amPm) !==
+        (storedTime ? `${storedTime[1]}:${storedTime[2]}:00` : null);
+    const answersChanged = questions.some((question) => {
+      const saved = entry.answers.find((answer) => answer.question_id === question.id);
+      return (answerTexts[question.id] ?? "").trim() !== (saved?.answer_text ?? "").trim();
+    });
+
+    return (
+      timeChanged ||
+      moodScore.trim() !== (entry.mood_score == null ? "" : String(entry.mood_score)) ||
+      rpeScore !== entry.rpe_score ||
+      notes.trim() !== (entry.notes ?? "").trim() ||
+      answersChanged
+    );
+  }, [
+    amPm,
+    answerTexts,
+    entry,
+    isFinishingPhase,
+    isFoodEntry,
+    moodScore,
+    notes,
+    questions,
+    rpeScore,
+    timeString,
+  ]);
 
   useEffect(() => {
     const load = async () => {
@@ -59,8 +112,11 @@ export default function JournalEntryDetail() {
 
         // Load entry + answers
         const data = await getEntryWithAnswers(entryId as string);
+        setAiInsight(await getJournalAiInsight(entryId as string).catch(() => null));
         setEntry(data);
         setMoodScore(data.mood_score != null ? String(data.mood_score) : "");
+        setRpeScore(data.rpe_score);
+        setNotes(data.notes || "");
 
         // Initialize time + AM/PM from stored 24h time
         if (data.entry_time) {
@@ -104,13 +160,13 @@ export default function JournalEntryDetail() {
   }, [entryId]);
 
   const handleSave = async () => {
-    if (!entry) return;
+    if (!entry || !hasChanges) return;
     try {
       setSaving(true);
 
       // Validate and normalize time
-      const normalizedTime = normalizeTime(timeString, amPm);
-      if (!normalizedTime) {
+      const normalizedTime = isFinishingPhase || isFoodEntry ? entry.entry_time : normalizeTime(timeString, amPm);
+      if (!isFinishingPhase && !isFoodEntry && !normalizedTime) {
         Alert.alert("Error", "Please enter a valid time (hour: 1-12, minute: 0-59).");
         setSaving(false);
         return;
@@ -127,16 +183,21 @@ export default function JournalEntryDetail() {
       await updateEntry(entry.id, {
         entry_time: normalizedTime,
         mood_score: numericMood ?? null,
+        rpe_score: rpeScore,
+        notes: notes.trim() || null,
       });
 
       // Sync answers: update existing answers and create new ones for questions
-      if (questions.length > 0) {
+      const postSessionQuestions = getPostQuestions(questions);
+      const questionsToSave =
+        isFinishingPhase && postSessionQuestions.length ? postSessionQuestions : questions;
+      if (questionsToSave.length > 0) {
         const existingByQuestion = new Map(
           entry.answers.map((a) => [a.question_id, a])
         );
 
         const updatePromises: Promise<unknown>[] = [];
-        for (const q of questions) {
+        for (const q of questionsToSave) {
           const newText = (answerTexts[q.id] ?? "").trim();
           const existingAnswer = existingByQuestion.get(q.id);
 
@@ -166,7 +227,11 @@ export default function JournalEntryDetail() {
         }
       }
 
-      Alert.alert("Saved", "Your updates have been saved.");
+      await requestJournalAiInsight(entry.id).catch((error) => {
+        console.warn("Failed to request journal AI insight:", error);
+      });
+
+      Alert.alert("Saved", isFinishingPhase ? "Journal finished." : "Your updates have been saved.");
       router.back();
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Failed to save changes");
@@ -208,329 +273,127 @@ export default function JournalEntryDetail() {
   if (loading || !entry) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color="#38bdf8" />
+        <ActivityIndicator color={colors.accentSolid} />
       </View>
     );
   }
 
-  return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerText}>
-            <Text style={styles.heading}>{entry.title || "Journal Entry"}</Text>
-            <Text style={styles.subheading}>{formatEntryDate(entry.entry_date)}</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+  const preQuestions = getPreQuestions(questions);
+  const postQuestions = getPostQuestions(questions);
+  const phaseLabels = getPhaseLabels(entry.title);
+  const hasPhasedQuestions = preQuestions.length > 0 || postQuestions.length > 0;
+  const visibleQuestions = isFinishingPhase && postQuestions.length ? postQuestions : questions;
 
-        <ScrollView 
+  return (
+    <View style={layout.page}>
+      <PageHeader
+        title={isFinishingPhase ? `Finish ${entry.title} Journal` : entry.title || "Journal Entry"}
+        subtitle={formatEntryDate(entry.entry_date)}
+        onBack={() => router.back()}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="always"
-          showsVerticalScrollIndicator={true}
-          scrollEnabled={true}
-          nestedScrollEnabled={false}
-          bounces={true}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator
+          onScrollBeginDrag={Keyboard.dismiss}
         >
-          <TimeInput
-            timeString={timeString}
-            amPm={amPm}
-            onTimeChange={setTimeString}
-            onAmPmChange={setAmPm}
-          />
+          {!isFinishingPhase && !isFoodEntry && (
+            <TimeInput
+              timeString={timeString}
+              amPm={amPm}
+              onTimeChange={setTimeString}
+              onAmPmChange={setAmPm}
+            />
+          )}
 
           <MoodScoreInput
             moodScore={moodScore}
             onMoodChange={setMoodScore}
           />
+          {!isFoodEntry && <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />}
 
-          <QuestionsSection
-            questions={questions}
-            answers={answerTexts}
-            onAnswerChange={(questionId, text) =>
-              setAnswerTexts((prev) => ({
-                ...prev,
-                [questionId]: text,
-              }))
-            }
-          />
+          <AiInsightCards insight={aiInsight} />
+
+          {isPhasedEntry && !isFinishingPhase && hasPhasedQuestions ? (
+            <>
+              <QuestionsSection
+                title={`${phaseLabels.pre} questions`}
+                questions={preQuestions}
+                answers={answerTexts}
+                onAnswerChange={(questionId, text) =>
+                  setAnswerTexts((prev) => ({ ...prev, [questionId]: text }))
+                }
+              />
+              <QuestionsSection
+                title={`${phaseLabels.post} questions`}
+                questions={postQuestions}
+                answers={answerTexts}
+                onAnswerChange={(questionId, text) =>
+                  setAnswerTexts((prev) => ({ ...prev, [questionId]: text }))
+                }
+              />
+            </>
+          ) : (
+            <QuestionsSection
+              title={isFinishingPhase ? `${phaseLabels.post} questions` : "Questions"}
+              questions={visibleQuestions}
+              answers={answerTexts}
+              onAnswerChange={(questionId, text) =>
+                setAnswerTexts((prev) => ({ ...prev, [questionId]: text }))
+              }
+            />
+          )}
+          <OtherNotes value={notes} onChangeText={setNotes} />
         </ScrollView>
+      </KeyboardAvoidingView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.deleteButton, deleting && styles.deleteButtonDisabled]}
-            onPress={handleDelete}
-            disabled={deleting || saving}
-          >
-            <Text style={styles.deleteButtonText}>
-              {deleting ? "Deleting..." : "Delete Entry"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={saving || deleting}
-          >
-            <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save Changes"}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.footerButtons}>
-          <TouchableOpacity
-            style={styles.bottomIconButton}
-            onPress={() => router.push("/")}
-          >
-            <Ionicons name="home" size={28} color="#3b82f6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.bottomIconButton}
-            onPress={() => router.push("/calendar")}
-          >
-            <View style={styles.calendarInner}>
-              <View style={styles.calendarHeader} />
-              <View style={styles.calendarBody} />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableWithoutFeedback>
+      {!isKeyboardVisible ? (
+        <>
+          <View style={styles.footer}>
+            <ButtonRow>
+              <AppButton
+                label={deleting ? "Deleting..." : "Delete entry"}
+                onPress={handleDelete}
+                disabled={deleting || saving}
+                variant="dangerOutline"
+                flex
+              />
+              <AppButton
+                label={saving ? "Saving..." : isFinishingPhase ? "Finish journal" : "Save changes"}
+                onPress={handleSave}
+                disabled={saving || deleting || !hasChanges}
+                flex
+              />
+            </ButtonRow>
+          </View>
+          <BottomNav onHome={() => router.push("/")} onCalendar={() => router.push("/calendar")} />
+        </>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    paddingTop: 60,
-    paddingHorizontal: 24,
-  },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
-  },
-  headerText: {
-    flexShrink: 1,
-    flex: 1,
-    paddingRight: 12,
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#e5e7eb",
-    letterSpacing: -0.3,
-  },
-  subheading: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginTop: 4,
-  },
-  backText: {
-    fontSize: 14,
-    color: "#38bdf8",
-    fontWeight: "600",
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 12,
-  },
-  timeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  timeInputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    gap: 4,
-  },
-  timeInput: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    textAlign: "center",
-    minWidth: 40,
-    paddingVertical: 4,
-  },
-  timeSeparator: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  amPmToggle: {
-    flexDirection: "row",
-    backgroundColor: "#020617",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    overflow: "hidden",
-  },
-  amPmOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  amPmOptionSelected: {
-    backgroundColor: "#0b1120",
-    borderColor: "#38bdf8",
-  },
-  amPmText: {
-    fontSize: 14,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  amPmTextSelected: {
-    color: "#e5e7eb",
-    fontWeight: "700",
-  },
-  moodHelperText: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginBottom: 8,
-  },
-  moodRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  moodOption: {
-    minWidth: 40,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    marginRight: 8,
-    marginBottom: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-  moodOptionSelected: {
-    borderColor: "#38bdf8",
-    backgroundColor: "#0b1120",
-  },
-  moodOptionText: {
-    fontSize: 16,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  moodOptionTextSelected: {
-    color: "#e5e7eb",
-    fontWeight: "700",
-  },
-  qaCard: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-  },
-  questionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 8,
-  },
-  answerInput: {
-    backgroundColor: "#020617",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#e5e7eb",
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
+  content: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: space.lg },
   footer: {
-    paddingVertical: 16,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  deleteButton: {
-    backgroundColor: "#020617",
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#ef4444",
-  },
-  deleteButtonDisabled: {
-    opacity: 0.5,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#ef4444",
-  },
-  saveButton: {
-    backgroundColor: "#38bdf8",
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#020617",
-  },
-  footerButtons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
-    paddingVertical: 12,
-    paddingBottom: 20,
-  },
-  bottomIconButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-  calendarInner: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    overflow: "hidden",
-  },
-  calendarHeader: {
-    height: 10,
-    backgroundColor: "#3b82f6",
-  },
-  calendarBody: {
-    flex: 1,
-    backgroundColor: "#020617",
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+    alignSelf: "stretch",
+    width: "100%",
   },
 });

@@ -46,7 +46,7 @@ export async function deleteAccount(): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (userError) {
-    throw handleSupabaseError(userError);
+    throw new Error(userError.message);
   }
 
   if (!user) {
@@ -65,19 +65,26 @@ export async function deleteAccount(): Promise<void> {
   // Note: This doesn't delete auth.users, but removes all user data
   // The auth.users record will remain but be effectively inactive
   
-  try {
-    // Delete notification preferences
-    await supabase
-      .from("notification_preferences")
-      .delete()
-      .eq("user_id", user.id);
-  } catch (e) {
-    // Ignore errors if table doesn't exist or RLS prevents
-    console.warn("Could not delete notification preferences:", e);
+  const { error: prefsError } = await supabase
+    .from("notification_preferences")
+    .delete()
+    .eq("user_id", user.id);
+  if (prefsError) {
+    console.warn("Could not delete notification preferences:", prefsError.message);
   }
 
-  // Sign out the user
-  await supabase.auth.signOut();
+  const { error: tokensError } = await supabase
+    .from("notification_tokens")
+    .delete()
+    .eq("user_id", user.id);
+  if (tokensError) {
+    console.warn("Could not delete notification tokens:", tokensError.message);
+  }
+
+  const { error: signOutError } = await supabase.auth.signOut();
+  if (signOutError) {
+    console.warn("Sign out after fallback deletion failed:", signOutError.message);
+  }
 
   // If RPC function doesn't exist, provide helpful error
   if (rpcError.message?.includes("function") || rpcError.message?.includes("does not exist")) {

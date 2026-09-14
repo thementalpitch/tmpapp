@@ -1,5 +1,7 @@
 import { Stack, useRouter } from "expo-router";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Text, StyleSheet } from "react-native";
+import { AppButton, Page, PageHeader } from "../src/components/AppChrome";
+import { type as typeStyles } from "../src/theme";
 
 export default function ModalScreen() {
   const router = useRouter();
@@ -7,48 +9,15 @@ export default function ModalScreen() {
   return (
     <>
       <Stack.Screen options={{ presentation: "modal", title: "Modal" }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>Modal</Text>
-        <Text style={styles.body}>
-          This is a temporary modal screen to verify navigation wiring.
-        </Text>
-        <Pressable style={styles.button} onPress={() => router.back()}>
-          <Text style={styles.buttonText}>Close</Text>
-        </Pressable>
-      </View>
+      <Page style={styles.page}>
+        <PageHeader title="Modal" subtitle="Navigation check" />
+        <Text style={typeStyles.body}>Temporary screen to verify navigation wiring.</Text>
+        <AppButton label="Close" onPress={() => router.back()} variant="secondary" />
+      </Page>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    paddingHorizontal: 24,
-    paddingTop: 80
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#e5e7eb",
-    marginBottom: 8
-  },
-  body: {
-    fontSize: 16,
-    color: "#9ca3af",
-    marginBottom: 24
-  },
-  button: {
-    alignSelf: "flex-start",
-    backgroundColor: "#38bdf8",
-    borderRadius: 999,
-    paddingHorizontal: 20,
-    paddingVertical: 10
-  },
-  buttonText: {
-    color: "#0f172a",
-    fontWeight: "600"
-  }
+  page: { gap: 20 },
 });
-
-

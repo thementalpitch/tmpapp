@@ -1,5 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import { FormSection } from "./AppChrome";
+import { colors, font, input, radius, space, type as typeStyles } from "../theme";
 
 interface TimeInputProps {
   timeString: string;
@@ -11,123 +13,92 @@ interface TimeInputProps {
 export function TimeInput({ timeString, amPm, onTimeChange, onAmPmChange }: TimeInputProps) {
   const handleHourChange = (text: string) => {
     const parts = timeString.split(":");
-    const hour = text.replace(/[^0-9]/g, "").slice(0, 2);
-    onTimeChange(`${hour}:${parts[1] || ""}`);
+    onTimeChange(`${text.replace(/[^0-9]/g, "").slice(0, 2)}:${parts[1] || ""}`);
   };
 
   const handleMinuteChange = (text: string) => {
     const parts = timeString.split(":");
-    const minute = text.replace(/[^0-9]/g, "").slice(0, 2);
-    onTimeChange(`${parts[0] || ""}:${minute}`);
+    onTimeChange(`${parts[0] || ""}:${text.replace(/[^0-9]/g, "").slice(0, 2)}`);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Time</Text>
-      <View style={styles.timeContainer}>
-        <View style={styles.timeInputGroup}>
+    <FormSection title="Time" hint="When did this session happen?">
+      <View style={styles.row}>
+        <View style={styles.timeGroup}>
           <TextInput
-            style={styles.timeInput}
+            style={styles.timeField}
             placeholder="12"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={colors.faint}
             value={timeString.split(":")[0] || ""}
             onChangeText={handleHourChange}
             keyboardType="number-pad"
             maxLength={2}
           />
-          <Text style={styles.timeSeparator}>:</Text>
+          <Text style={styles.sep}>:</Text>
           <TextInput
-            style={styles.timeInput}
+            style={styles.timeField}
             placeholder="00"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={colors.faint}
             value={timeString.split(":")[1] || ""}
             onChangeText={handleMinuteChange}
             keyboardType="number-pad"
             maxLength={2}
           />
         </View>
-        <View style={styles.amPmToggle}>
-          <TouchableOpacity
-            style={[styles.amPmOption, amPm === "AM" && styles.amPmOptionSelected]}
-            onPress={() => onAmPmChange("AM")}
-          >
-            <Text style={[styles.amPmText, amPm === "AM" && styles.amPmTextSelected]}>AM</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.amPmOption, amPm === "PM" && styles.amPmOptionSelected]}
-            onPress={() => onAmPmChange("PM")}
-          >
-            <Text style={[styles.amPmText, amPm === "PM" && styles.amPmTextSelected]}>PM</Text>
-          </TouchableOpacity>
+        <View style={styles.amPm}>
+          {(["AM", "PM"] as const).map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[styles.amPmBtn, amPm === value && styles.amPmBtnActive]}
+              onPress={() => onAmPmChange(value)}
+              activeOpacity={0.72}
+            >
+              <Text style={[styles.amPmText, amPm === value && styles.amPmTextActive]}>{value}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
-    </View>
+    </FormSection>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 12,
-  },
-  timeContainer: {
+  row: { flexDirection: "row", alignItems: "stretch", gap: space.md },
+  timeGroup: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    justifyContent: "center",
+    ...input,
+    paddingVertical: space.md,
+    gap: space.xs,
   },
-  timeInputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    gap: 4,
-  },
-  timeInput: {
-    fontSize: 18,
+  timeField: {
+    fontFamily: font,
+    fontSize: 28,
     fontWeight: "600",
-    color: "#e5e7eb",
+    color: colors.text,
     textAlign: "center",
-    minWidth: 40,
-    paddingVertical: 4,
+    minWidth: 44,
+    paddingVertical: 0,
+    letterSpacing: -0.5,
   },
-  timeSeparator: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  amPmToggle: {
+  sep: { fontFamily: font, fontSize: 24, fontWeight: "500", color: colors.faint },
+  amPm: {
     flexDirection: "row",
-    backgroundColor: "#020617",
-    borderRadius: 999,
+    borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: "#1e293b",
+    borderColor: colors.borderSubtle,
     overflow: "hidden",
+    backgroundColor: colors.surfaceRaised,
   },
-  amPmOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  amPmBtn: {
+    paddingHorizontal: space.lg,
+    justifyContent: "center",
+    minWidth: 52,
+    minHeight: 48,
   },
-  amPmOptionSelected: {
-    backgroundColor: "#0b1120",
-    borderColor: "#38bdf8",
-  },
-  amPmText: {
-    fontSize: 14,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  amPmTextSelected: {
-    color: "#e5e7eb",
-    fontWeight: "700",
-  },
+  amPmBtnActive: { backgroundColor: colors.accentSolid },
+  amPmText: { fontFamily: font, fontSize: 15, fontWeight: "600", color: colors.muted, textAlign: "center" },
+  amPmTextActive: { color: colors.onPrimary },
 });
-

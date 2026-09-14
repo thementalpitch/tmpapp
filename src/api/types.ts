@@ -49,6 +49,7 @@ export interface JournalQuestion {
   is_required: boolean;
   sort_order: number;
   is_system_default: boolean;
+  retired_at: string | null;
   created_at: string;
 }
 
@@ -82,6 +83,7 @@ export interface JournalEntry {
   title: string | null;
   notes: string | null;
   mood_score: number | null; // 1-10
+  rpe_score: number | null; // 0-10
   created_at: string;
   updated_at: string;
 }
@@ -94,6 +96,7 @@ export interface JournalEntryInsert {
   title?: string | null;
   notes?: string | null;
   mood_score?: number | null; // 1-10
+  rpe_score?: number | null; // 0-10
 }
 
 export interface JournalEntryUpdate {
@@ -103,6 +106,7 @@ export interface JournalEntryUpdate {
   title?: string | null;
   notes?: string | null;
   mood_score?: number | null; // 1-10
+  rpe_score?: number | null; // 0-10
 }
 
 // ============================================================================
@@ -204,7 +208,7 @@ export interface JournalEntryWithWorkoutType extends JournalEntry {
  * Architecture Note: Used for full entry detail views.
  */
 export interface JournalEntryWithAnswers extends JournalEntry {
-  answers: Array<JournalEntryAnswer & { question: JournalQuestion }>;
+  answers: (JournalEntryAnswer & { question: JournalQuestion })[];
 }
 
 /**
@@ -221,6 +225,24 @@ export interface JournalQuestionWithWorkoutType extends JournalQuestion {
 export interface DailyMoodAverage {
   date: string; // ISO 8601 date (YYYY-MM-DD)
   average_mood: number | null;
+}
+
+// ============================================================================
+// Journal AI Insights
+// ============================================================================
+
+export interface JournalAiInsight {
+  entry_id: UUID;
+  user_id: UUID;
+  status: "pending" | "processing" | "complete" | "error";
+  experience: string | null;
+  tips: string[];
+  model: string | null;
+  requested_at: string;
+  generated_at: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================================================
@@ -280,8 +302,10 @@ export interface NotificationPreferences {
   id: string;
   user_id: string;
   enabled: boolean;
-  reminder_times: string[]; // Array of times like ["09:00", "18:00"]
+  reminder_times: string[]; // Local wall-clock "HH:MM" (24h), not UTC — use with timezone
   reminder_days: number[]; // Array of day numbers: 0=Sunday, 1=Monday, ..., 6=Saturday
+  daily_reminder_times: Record<string, string>; // Day number to local wall-clock "HH:MM"
+  timezone: string; // IANA timezone, e.g. America/Los_Angeles
   streak_reminders: boolean;
   mood_insights: boolean;
   created_at: string;
@@ -293,6 +317,8 @@ export interface NotificationPreferencesInsert {
   enabled?: boolean;
   reminder_times?: string[];
   reminder_days?: number[];
+  daily_reminder_times?: Record<string, string>;
+  timezone?: string;
   streak_reminders?: boolean;
   mood_insights?: boolean;
 }
@@ -301,8 +327,31 @@ export interface NotificationPreferencesUpdate {
   enabled?: boolean;
   reminder_times?: string[];
   reminder_days?: number[];
+  daily_reminder_times?: Record<string, string>;
+  timezone?: string;
   streak_reminders?: boolean;
   mood_insights?: boolean;
+}
+
+export interface NotificationToken {
+  id: string;
+  user_id: string;
+  expo_push_token: string;
+  device_id: string | null;
+  platform: string | null;
+  app_version: string | null;
+  enabled: boolean;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationTokenUpsert {
+  expo_push_token: string;
+  device_id?: string | null;
+  platform?: string | null;
+  app_version?: string | null;
+  enabled?: boolean;
 }
 
 // ============================================================================

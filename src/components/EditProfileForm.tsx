@@ -1,14 +1,8 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from "react-native";
 import type { Profile, ProfileUpdate } from "../api/types";
+import { AppButton, FormSection } from "./AppChrome";
+import { colors, font, input, radius, space, type as typeStyles } from "../theme";
 
 interface EditProfileFormProps {
   profile: Profile | null;
@@ -17,16 +11,8 @@ interface EditProfileFormProps {
 }
 
 const SPORTS = [
-  "Soccer",
-  "Basketball",
-  "Baseball",
-  "Football",
-  "Tennis",
-  "Swimming",
-  "Track & Field",
-  "Volleyball",
-  "Golf",
-  "Other",
+  "Soccer", "Basketball", "Baseball", "Football", "Tennis",
+  "Swimming", "Track & Field", "Volleyball", "Golf", "Other",
 ];
 
 const POSITIONS: Record<string, string[]> = {
@@ -48,7 +34,6 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
   const [selectedSport, setSelectedSport] = useState(profile?.preferred_sport || "");
   const [selectedPosition, setSelectedPosition] = useState(profile?.preferred_position || "");
   const [saving, setSaving] = useState(false);
-
   const availablePositions = selectedSport ? POSITIONS[selectedSport] || [] : [];
 
   const handleSave = async () => {
@@ -68,188 +53,102 @@ export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormPr
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.section}>
-          <Text style={styles.label}>First Name</Text>
-          <TextInput
-            style={styles.input}
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="Enter first name"
-            placeholderTextColor="#64748b"
-          />
-        </View>
+    <View style={styles.form}>
+      <FormSection title="Name">
+        <Text style={styles.fieldLabel}>First name</Text>
+        <TextInput
+          style={styles.fieldInput}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          placeholderTextColor={colors.faint}
+        />
+        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced]}>Last name</Text>
+        <TextInput
+          style={styles.fieldInput}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          placeholderTextColor={colors.faint}
+        />
+      </FormSection>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Last Name</Text>
-          <TextInput
-            style={styles.input}
-            value={lastName}
-            onChangeText={setLastName}
-            placeholder="Enter last name"
-            placeholderTextColor="#64748b"
-          />
+      <FormSection title="Sport">
+        <View style={styles.options}>
+          {SPORTS.map((sport) => (
+            <TouchableOpacity
+              key={sport}
+              style={[styles.chip, selectedSport === sport && styles.chipActive]}
+              onPress={() => {
+                setSelectedSport(sport);
+                setSelectedPosition("");
+              }}
+              activeOpacity={0.72}
+            >
+              <Text style={[styles.chipText, selectedSport === sport && styles.chipTextActive]}>
+                {sport}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      </FormSection>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Preferred Sport</Text>
-          <View style={styles.optionsContainer}>
-            {SPORTS.map((sport) => (
+      {selectedSport && availablePositions.length > 0 && (
+        <FormSection title="Position">
+          <View style={styles.options}>
+            {availablePositions.map((position) => (
               <TouchableOpacity
-                key={sport}
-                style={[
-                  styles.optionButton,
-                  selectedSport === sport && styles.optionButtonActive,
-                ]}
-                onPress={() => {
-                  setSelectedSport(sport);
-                  setSelectedPosition(""); // Reset position when sport changes
-                }}
+                key={position}
+                style={[styles.chip, selectedPosition === position && styles.chipActive]}
+                onPress={() => setSelectedPosition(position)}
+                activeOpacity={0.72}
               >
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedSport === sport && styles.optionTextActive,
-                  ]}
-                >
-                  {sport}
+                <Text style={[styles.chipText, selectedPosition === position && styles.chipTextActive]}>
+                  {position}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </FormSection>
+      )}
 
-        {selectedSport && availablePositions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.label}>Preferred Position</Text>
-            <View style={styles.optionsContainer}>
-              {availablePositions.map((position) => (
-                <TouchableOpacity
-                  key={position}
-                  style={[
-                    styles.optionButton,
-                    selectedPosition === position && styles.optionButtonActive,
-                  ]}
-                  onPress={() => setSelectedPosition(position)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedPosition === position && styles.optionTextActive,
-                    ]}
-                  >
-                    {position}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={onCancel}
-            disabled={saving}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            <Text style={styles.saveButtonText}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <View style={styles.actions}>
+        <AppButton label="Cancel" onPress={onCancel} variant="secondary" disabled={saving} />
+        <AppButton label={saving ? "Saving..." : "Save changes"} onPress={handleSave} disabled={saving} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#0f172a",
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    fontSize: 16,
-    color: "#e5e7eb",
-  },
-  optionsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  optionButton: {
+  form: { paddingBottom: space.xxl },
+  fieldLabel: { ...typeStyles.label, marginBottom: space.sm },
+  fieldLabelSpaced: { marginTop: space.lg },
+  fieldInput: { ...input, fontFamily: font },
+  options: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  chip: {
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: "#0f172a",
+    paddingHorizontal: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#1e293b",
+    borderColor: colors.borderSubtle,
+    minHeight: 40,
+    justifyContent: "center",
   },
-  optionButtonActive: {
-    backgroundColor: "#38bdf8",
-    borderColor: "#38bdf8",
+  chipActive: {
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.accentSolid,
   },
-  optionText: {
+  chipText: {
+    fontFamily: font,
     fontSize: 14,
     fontWeight: "500",
-    color: "#9ca3af",
+    color: colors.muted,
   },
-  optionTextActive: {
-    color: "#ffffff",
+  chipTextActive: {
+    color: colors.accentStrong,
     fontWeight: "600",
   },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#1e293b",
-  },
-  saveButton: {
-    backgroundColor: "#38bdf8",
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#9ca3af",
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
+  actions: { gap: space.sm, marginTop: space.sm },
 });
-

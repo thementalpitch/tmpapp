@@ -1,43 +1,33 @@
 import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Text } from "react-native";
+import { useRouter, useLocalSearchParams, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/contexts/AuthContext";
 import { formatDateLocal, parseISODateLocal, todayLocalDateString } from "../../src/utils/date";
-import { getEntriesByDate, type JournalEntry } from "../../src/api";
+import {
+  getEntriesByDate,
+  getJournalAiInsightsByEntryIds,
+  type JournalAiInsight,
+  type JournalEntry,
+} from "../../src/api";
+import { AppButton, BottomNav, EmptyState, Page, PageHeader } from "../../src/components/AppChrome";
+import { AiInsightButton, AiInsightModal } from "../../src/components/JournalAiInsight";
+import { MoodRing } from "../../src/components/MoodRing";
+import { card, colors, font, radius, space, type as typeStyles } from "../../src/theme";
+import { isPhasedJournalName } from "../../src/utils/journalPhases";
 
 function formatDateHeading(date: Date): string {
-  return formatDateLocal(date, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatDateLocal(date, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatTime(timeString: string | null): string {
   if (!timeString) return "Time not set";
-
-  // Accept values like "HH:MM", "HH:MM:SS", or "HH:MM:SS+TZ"
   const match = timeString.match(/(\d{2}):(\d{2})/);
   if (!match) return "Time not set";
-
-  const [, hh, mm] = match;
-  const hour24 = Number(hh);
+  const hour24 = Number(match[1]);
   if (Number.isNaN(hour24)) return "Time not set";
-
-  const isAM = hour24 < 12;
-  const hour12 = ((hour24 + 11) % 12) + 1; // 0 -> 12, 13 -> 1, etc.
-
-  return `${hour12}:${mm} ${isAM ? "AM" : "PM"}`;
+  const hour12 = ((hour24 + 11) % 12) + 1;
+  return `${hour12}:${match[2]} ${hour24 < 12 ? "AM" : "PM"}`;
 }
 
 export default function JournalScreen() {
@@ -46,282 +36,142 @@ export default function JournalScreen() {
   const { date } = useLocalSearchParams<{ date?: string }>();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [insightsByEntryId, setInsightsByEntryId] = useState<Record<string, JournalAiInsight>>({});
+  const [selectedInsight, setSelectedInsight] = useState<JournalAiInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Use provided date or default to today
   const targetDateStr = typeof date === "string" ? date : todayLocalDateString();
   const targetDate = parseISODateLocal(targetDateStr);
-  const isoDate = targetDateStr; // YYYY-MM-DD (UTC)
 
   const loadEntries = useCallback(async () => {
     if (!user) return;
-    
     try {
       setLoading(true);
       setError(null);
-      const data = await getEntriesByDate(isoDate);
-      setEntries(data);
+      const nextEntries = await getEntriesByDate(targetDateStr);
+      setEntries(nextEntries);
+      setInsightsByEntryId(
+        await getJournalAiInsightsByEntryIds(nextEntries.map((entry) => entry.id)).catch(() => ({}))
+      );
     } catch (err: any) {
       setError(err?.message || "Failed to load entries");
     } finally {
       setLoading(false);
     }
-  }, [user, isoDate]);
+  }, [user, targetDateStr]);
 
-  // Load entries when screen comes into focus (e.g., after editing an entry)
-  // This ensures the list refreshes when returning from the detail page
-  useFocusEffect(
-    useCallback(() => {
-      loadEntries();
-    }, [loadEntries])
-  );
+  useFocusEffect(useCallback(() => { loadEntries(); }, [loadEntries]));
 
   const renderItem = ({ item }: { item: JournalEntry }) => {
+    const needsFinish = isPhasedJournalName(item.title) && item.mood_score == null;
+    const insight = insightsByEntryId[item.id];
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/journal/${item.id}`)}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.title || "Untitled session"}</Text>
-          {item.mood_score != null && (
-            <View style={styles.moodPill}>
-              <Text style={styles.moodLabel}>Mood</Text>
-              <Text style={styles.moodValue}>{item.mood_score}/10</Text>
+      <TouchableOpacity style={styles.card} onPress={() => router.push(`/journal/${item.id}`)} activeOpacity={0.72}>
+        <View style={styles.cardTop}>
+          <View style={styles.cardMain}>
+            <View style={styles.titleRow}>
+              <Text style={[typeStyles.cardTitle, styles.titleText]} numberOfLines={2}>
+                {item.title || "Untitled session"}
+              </Text>
+              {needsFinish && (
+                <View style={styles.finishPill}>
+                  <Text style={styles.finishPillText}>Finish</Text>
+                </View>
+              )}
             </View>
-          )}
+            <Text style={typeStyles.caption}>{formatTime(item.entry_time)}</Text>
+            {item.notes ? (
+              <Text style={styles.notes} numberOfLines={2}>
+                {item.notes}
+              </Text>
+            ) : null}
+          </View>
+          {insight ? <AiInsightButton insight={insight} onPress={setSelectedInsight} /> : null}
+          {item.mood_score != null && <MoodRing score={item.mood_score} size="sm" />}
         </View>
-        <Text style={styles.cardMeta}>{formatTime(item.entry_time)}</Text>
-        {item.notes ? (
-          <Text style={styles.cardNotes} numberOfLines={2}>
-            {item.notes}
-          </Text>
-        ) : null}
       </TouchableOpacity>
     );
   };
 
+  const newPath = (`/journal/new${date ? `?date=${date}` : ""}`) as Href;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerTextWrapper}>
-          <Text style={styles.heading}>Your Journal</Text>
-          <Text style={styles.subheading}>{formatDateHeading(targetDate)}</Text>
-        </View>
-        <TouchableOpacity onPress={() => router.push("/")} style={styles.homeButton}>
-          <Text style={styles.homeButtonText}>Home</Text>
-        </TouchableOpacity>
-      </View>
+    <Page>
+      <PageHeader title="Your Journal" subtitle={formatDateHeading(targetDate)} onBack={() => router.back()} />
 
       {loading ? (
-        <View style={styles.centerContent}>
-          <ActivityIndicator color="#38bdf8" />
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accentSolid} />
         </View>
       ) : error ? (
-        <View style={styles.centerContent}>
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.center}>
+          <Text style={styles.error}>{error}</Text>
         </View>
       ) : entries.length === 0 ? (
-        <View style={styles.placeholderWrapper}>
-          <Text style={styles.placeholderTitle}>
-            {date ? "No entries yet for this date" : "No entries yet for today"}
-          </Text>
-          <Text style={styles.placeholderBody}>
-            Capture how you feel, what you trained, or how you played by creating your first
-            journal entry.
-          </Text>
-        </View>
+        <EmptyState
+          title={date ? "No entries for this date" : "No entries today"}
+          body="Log how you felt, trained, or played."
+          action={<AppButton label="New entry" icon="add" onPress={() => router.push(newPath)} />}
+        />
       ) : (
         <FlatList
+          style={styles.list}
           data={entries}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      <View style={styles.footerButtons}>
-        <TouchableOpacity
-          style={styles.bottomIconButton}
-          onPress={() => router.push("/")}
-        >
-          <Ionicons name="home" size={28} color="#3b82f6" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bottomIconButton}
-          onPress={() => router.push(`/journal/new${date ? `?date=${date}` : ""}`)}
-        >
-          <Text style={styles.bottomIconText}>+</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bottomIconButton}
-          onPress={() => router.push("/calendar")}
-        >
-          <View style={styles.calendarInner}>
-            <View style={styles.calendarHeader} />
-            <View style={styles.calendarBody} />
-          </View>
-        </TouchableOpacity>
-      </View>
-    </View>
+      <BottomNav
+        onHome={() => router.push("/")}
+        onAdd={() => router.push(newPath)}
+        onCalendar={() => router.push("/calendar")}
+      />
+      <AiInsightModal
+        insight={selectedInsight}
+        visible={selectedInsight !== null}
+        onClose={() => setSelectedInsight(null)}
+      />
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    paddingTop: 60,
-    paddingHorizontal: 24,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
-  },
-  headerTextWrapper: {
-    flexShrink: 1,
-    flex: 1,
-  },
-  heading: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#e5e7eb",
-    letterSpacing: -0.5,
-  },
-  subheading: {
-    marginTop: 4,
-    fontSize: 18,
-    color: "#9ca3af",
-  },
-  homeButton: {
-    borderWidth: 1,
-    borderColor: "#3b82f6",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#0f172a",
-  },
-  homeButtonText: {
-    color: "#3b82f6",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  errorText: {
-    color: "#f97373",
-    fontSize: 14,
-  },
-  placeholderWrapper: {
-    paddingTop: 48,
-    paddingHorizontal: 8,
-  },
-  placeholderTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 8,
-  },
-  placeholderBody: {
-    fontSize: 16,
-    color: "#9ca3af",
-    lineHeight: 20,
-  },
-  listContent: {
-    paddingBottom: 48,
-  },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  error: { fontFamily: font, fontSize: 14, color: colors.danger },
+  list: { flex: 1 },
+  listContent: { paddingBottom: space.sm, gap: space.sm },
   card: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
+    ...card,
+    marginBottom: space.sm,
   },
-  cardHeader: {
+  cardTop: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
+    gap: space.md,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    flexShrink: 1,
-    marginRight: 8,
-  },
-  cardMeta: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginBottom: 4,
-  },
-  cardNotes: {
-    fontSize: 13,
-    color: "#cbd5f5",
-  },
-  moodPill: {
+  cardMain: { flex: 1, gap: space.xs },
+  titleRow: {
     flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 999,
-    backgroundColor: "#0b1120",
+    alignItems: "flex-start",
+    gap: space.sm,
+    flexWrap: "wrap",
+  },
+  titleText: { flex: 1 },
+  notes: {
+    fontFamily: font,
+    fontSize: 14,
+    color: colors.muted,
+    lineHeight: 20,
+    marginTop: space.xs,
+  },
+  finishPill: {
+    backgroundColor: colors.accentSolid,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "#38bdf8",
+    borderRadius: radius.pill,
   },
-  moodLabel: {
-    fontSize: 11,
-    color: "#9ca3af",
-    marginRight: 4,
-  },
-  moodValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#e5e7eb",
-  },
-  footerButtons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
-    paddingVertical: 16,
-    paddingBottom: 24,
-  },
-  bottomIconButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-  bottomIconText: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: "#e5e7eb",
-  },
-  calendarInner: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    overflow: "hidden",
-  },
-  calendarHeader: {
-    height: 10,
-    backgroundColor: "#3b82f6",
-  },
-  calendarBody: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
+  finishPillText: { fontFamily: font, fontSize: 12, fontWeight: "600", color: colors.onPrimary },
 });

@@ -21,6 +21,12 @@ import type {
 import { handleSupabaseError, NotFoundError, ValidationError } from "./errors";
 import { toISODateLocal } from "../utils/date";
 
+function validateRating(value: number | null | undefined, field: string, minimum: number) {
+  if (value != null && (!Number.isInteger(value) || value < minimum || value > 10)) {
+    throw new ValidationError(`${field} must be between ${minimum} and 10`, field);
+  }
+}
+
 /**
  * Get all journal entries for the current user.
  * 
@@ -315,15 +321,8 @@ export async function createEntry(
 ): Promise<JournalEntry> {
   const supabase = getSupabaseClient();
 
-  // Validate mood_score if provided
-  if (input.mood_score !== undefined && input.mood_score !== null) {
-    if (input.mood_score < 1 || input.mood_score > 10) {
-      throw new ValidationError(
-        "mood_score must be between 1 and 10",
-        "mood_score"
-      );
-    }
-  }
+  validateRating(input.mood_score, "mood_score", 1);
+  validateRating(input.rpe_score, "rpe_score", 0);
 
   const { data, error } = await supabase
     .from("journal_entries")
@@ -353,15 +352,8 @@ export async function updateEntry(
 ): Promise<JournalEntry> {
   const supabase = getSupabaseClient();
 
-  // Validate mood_score if provided
-  if (input.mood_score !== undefined && input.mood_score !== null) {
-    if (input.mood_score < 1 || input.mood_score > 10) {
-      throw new ValidationError(
-        "mood_score must be between 1 and 10",
-        "mood_score"
-      );
-    }
-  }
+  validateRating(input.mood_score, "mood_score", 1);
+  validateRating(input.rpe_score, "rpe_score", 0);
 
   const { data, error } = await supabase
     .from("journal_entries")

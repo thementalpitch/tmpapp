@@ -162,7 +162,7 @@ function generateInsights(
   // Streak insights
   if (summary.streakData.currentStreak > 0) {
     if (summary.streakData.currentStreak >= 7) {
-      insights.push(`🔥 Amazing! You're on a ${summary.streakData.currentStreak}-day streak!`);
+      insights.push(`You are on a ${summary.streakData.currentStreak}-day streak.`);
     } else {
       insights.push(`Keep it up! You've logged entries for ${summary.streakData.currentStreak} day${summary.streakData.currentStreak > 1 ? "s" : ""} in a row.`);
     }
@@ -170,9 +170,9 @@ function generateInsights(
 
   // Mood trend insights
   if (summary.moodTrend === "improving") {
-    insights.push("📈 Your mood has been improving over this period!");
+    insights.push("Your mood has been improving over this period.");
   } else if (summary.moodTrend === "declining") {
-    insights.push("💪 Consider trying different activities to boost your mood.");
+    insights.push("Consider trying different activities to support your mood.");
   }
 
   // Workout type insights
@@ -180,7 +180,7 @@ function generateInsights(
     const topWorkout = workoutStats[0];
     if (topWorkout.averageMood && topWorkout.averageMood >= 7) {
       insights.push(
-        `⭐ ${topWorkout.workoutTypeName} sessions are your mood booster (avg ${topWorkout.averageMood.toFixed(1)}/10)!`
+        `${topWorkout.workoutTypeName} sessions have your strongest mood average (${topWorkout.averageMood.toFixed(1)}/10).`
       );
     }
   }
@@ -195,16 +195,16 @@ function generateInsights(
 
     if (bestTime.averageMood && bestTime.averageMood >= 7) {
       const timeLabel = bestTime.timeOfDay.charAt(0).toUpperCase() + bestTime.timeOfDay.slice(1);
-      insights.push(`🌅 Your best mood scores come during ${timeLabel} sessions.`);
+      insights.push(`Your best mood scores come during ${timeLabel} sessions.`);
     }
   }
 
   // Average mood insights
   if (summary.averageMood !== null) {
     if (summary.averageMood >= 8) {
-      insights.push("✨ You're maintaining excellent mood scores!");
+      insights.push("You're maintaining excellent mood scores.");
     } else if (summary.averageMood >= 6) {
-      insights.push("👍 You're doing well! Keep tracking to see patterns.");
+      insights.push("You're doing well. Keep tracking to see patterns.");
     }
   }
 

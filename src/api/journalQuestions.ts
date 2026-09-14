@@ -29,6 +29,7 @@ export async function getJournalQuestions(): Promise<JournalQuestion[]> {
   const { data, error } = await supabase
     .from("journal_questions")
     .select("*")
+    .is("retired_at", null)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -53,6 +54,7 @@ export async function getQuestionsByWorkoutType(
     .from("journal_questions")
     .select("*")
     .eq("workout_type_id", workoutTypeId)
+    .is("retired_at", null)
     .order("sort_order", { ascending: true });
 
   if (error) {
@@ -82,6 +84,7 @@ export async function getQuestionsWithWorkoutTypes(): Promise<
       )
     `
     )
+    .is("retired_at", null)
     .order("sort_order", { ascending: true });
 
   if (error) {
@@ -115,6 +118,7 @@ export async function getSystemQuestionsByWorkoutType(
     .eq("workout_type_id", workoutTypeId)
     .is("owner_id", null)
     .eq("is_system_default", true)
+    .is("retired_at", null)
     .order("sort_order", { ascending: true });
 
   if (error) {
@@ -136,6 +140,7 @@ export async function getGenericQuestions(): Promise<JournalQuestion[]> {
     .from("journal_questions")
     .select("*")
     .is("workout_type_id", null)
+    .is("retired_at", null)
     .order("sort_order", { ascending: true });
 
   if (error) {

@@ -1,32 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView } from "react-native";
+import { AppButton } from "./AppChrome";
+import { card, colors, font, radius, type as typeStyles } from "../theme";
 
 interface TimePickerProps {
-  time: string; // Format: "HH:MM"
+  time: string;
   onTimeChange: (time: string) => void;
+  compact?: boolean;
 }
 
-export function TimePicker({ time, onTimeChange }: TimePickerProps) {
+export function TimePicker({ time, onTimeChange, compact = false }: TimePickerProps) {
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(() => {
-    const [hour] = time.split(":").map(Number);
-    return hour;
-  });
-  const [selectedMinute, setSelectedMinute] = useState(() => {
-    const [, minute] = time.split(":").map(Number);
-    return minute;
-  });
+  const [selectedHour, setSelectedHour] = useState(() => Number(time.split(":")[0]) || 0);
+  const [selectedMinute, setSelectedMinute] = useState(() => Number(time.split(":")[1]) || 0);
+
+  useEffect(() => {
+    const [hourPart, minutePart] = time.split(":");
+    setSelectedHour(Number(hourPart) || 0);
+    setSelectedMinute(Number(minutePart) || 0);
+  }, [time]);
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = [0, 15, 30, 45]; // Common minute intervals
+  const minutes = [0, 15, 30, 45];
 
   const handleConfirm = () => {
-    const timeStr = `${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`;
-    onTimeChange(timeStr);
+    onTimeChange(
+      `${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`
+    );
     setModalVisible(false);
   };
 
-  const formatTime = (hour: number, minute: number): string => {
+  const formatTime = (hour: number, minute: number) => {
     const period = hour >= 12 ? "PM" : "AM";
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
     return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
@@ -35,81 +39,52 @@ export function TimePicker({ time, onTimeChange }: TimePickerProps) {
   return (
     <>
       <TouchableOpacity
-        style={styles.timeButton}
+        style={[styles.trigger, compact && styles.triggerCompact]}
         onPress={() => setModalVisible(true)}
+        activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityLabel={`Change reminder time, currently ${formatTime(selectedHour, selectedMinute)}`}
       >
-        <Text style={styles.timeButtonText}>{formatTime(selectedHour, selectedMinute)}</Text>
+        <Text style={[styles.triggerText, compact && styles.triggerTextCompact]}>
+          {formatTime(selectedHour, selectedMinute)}
+        </Text>
       </TouchableOpacity>
 
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Time</Text>
-
-            <View style={styles.pickerContainer}>
-              <ScrollView style={styles.pickerColumn}>
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.overlay}>
+          <View style={styles.sheet}>
+            <Text style={typeStyles.sectionTitle}>Reminder time</Text>
+            <View style={styles.pickers}>
+              <ScrollView style={styles.column} showsVerticalScrollIndicator={false}>
                 {hours.map((hour) => (
                   <TouchableOpacity
                     key={hour}
-                    style={[
-                      styles.pickerItem,
-                      selectedHour === hour && styles.pickerItemSelected,
-                    ]}
+                    style={[styles.item, selectedHour === hour && styles.itemSelected]}
                     onPress={() => setSelectedHour(hour)}
                   >
-                    <Text
-                      style={[
-                        styles.pickerItemText,
-                        selectedHour === hour && styles.pickerItemTextSelected,
-                      ]}
-                    >
+                    <Text style={[styles.itemText, selectedHour === hour && styles.itemTextSelected]}>
                       {formatTime(hour, 0).split(":")[0]} {formatTime(hour, 0).split(" ")[1]}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-
-              <ScrollView style={styles.pickerColumn}>
+              <ScrollView style={styles.column} showsVerticalScrollIndicator={false}>
                 {minutes.map((minute) => (
                   <TouchableOpacity
                     key={minute}
-                    style={[
-                      styles.pickerItem,
-                      selectedMinute === minute && styles.pickerItemSelected,
-                    ]}
+                    style={[styles.item, selectedMinute === minute && styles.itemSelected]}
                     onPress={() => setSelectedMinute(minute)}
                   >
-                    <Text
-                      style={[
-                        styles.pickerItemText,
-                        selectedMinute === minute && styles.pickerItemTextSelected,
-                      ]}
-                    >
+                    <Text style={[styles.itemText, selectedMinute === minute && styles.itemTextSelected]}>
                       {String(minute).padStart(2, "0")}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleConfirm}
-              >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
-              </TouchableOpacity>
+            <View style={styles.actions}>
+              <AppButton label="Cancel" onPress={() => setModalVisible(false)} variant="secondary" />
+              <AppButton label="Confirm" onPress={handleConfirm} />
             </View>
           </View>
         </View>
@@ -119,91 +94,42 @@ export function TimePicker({ time, onTimeChange }: TimePickerProps) {
 }
 
 const styles = StyleSheet.create({
-  timeButton: {
-    backgroundColor: "#0f172a",
-    borderRadius: 8,
+  trigger: {
+    ...card,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    minWidth: 100,
+    alignSelf: "flex-start",
+    minWidth: 120,
     alignItems: "center",
   },
-  timeButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-  },
-  modalOverlay: {
+  triggerText: { ...typeStyles.cardTitle },
+  triggerCompact: { minWidth: 88, paddingHorizontal: 9, paddingVertical: 9 },
+  triggerTextCompact: { fontSize: 14 },
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
-  modalContent: {
-    backgroundColor: "#0f172a",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+  sheet: {
+    ...card,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingBottom: 32,
     maxHeight: "70%",
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#e5e7eb",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  pickerContainer: {
-    flexDirection: "row",
-    height: 200,
-    marginBottom: 20,
-  },
-  pickerColumn: {
-    flex: 1,
-  },
-  pickerItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  pickers: { flexDirection: "row", height: 200, marginBottom: 16, gap: 8 },
+  column: { flex: 1 },
+  item: {
+    paddingVertical: 11,
+    paddingHorizontal: 12,
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.sm,
     marginVertical: 2,
   },
-  pickerItemSelected: {
-    backgroundColor: "#38bdf8",
-  },
-  pickerItemText: {
-    fontSize: 16,
-    color: "#9ca3af",
-  },
-  pickerItemTextSelected: {
-    color: "#ffffff",
-    fontWeight: "600",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#1e293b",
-  },
-  confirmButton: {
-    backgroundColor: "#38bdf8",
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#9ca3af",
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
+  itemSelected: { backgroundColor: colors.accentSolid },
+  itemText: { fontFamily: font, fontSize: 15, color: colors.muted },
+  itemTextSelected: { color: colors.onPrimary, fontWeight: "600" },
+  actions: { gap: 10 },
 });
-

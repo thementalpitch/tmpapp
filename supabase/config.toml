@@ -1,0 +1,7 @@
+# Supabase local/dev config. Deploy functions with: supabase functions deploy send-journal-reminders
+
+[functions.send-journal-reminders]
+verify_jwt = false
+
+[functions.generate-journal-insight]
+verify_jwt = false

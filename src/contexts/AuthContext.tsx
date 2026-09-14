@@ -10,6 +10,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
+import { deactivateUserNotificationTokens } from "../api/notificationPreferences";
 import { getSupabaseClient } from "../services/supabaseClient";
 
 interface AuthContextType {
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    await deactivateUserNotificationTokens().catch(() => {});
     const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signOut();
 

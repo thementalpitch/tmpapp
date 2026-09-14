@@ -3,16 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   TextInput,
   ActivityIndicator,
   Alert,
   Keyboard,
-  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import {
   getWorkoutTypes,
   getQuestionsByWorkoutType,
@@ -20,15 +19,25 @@ import {
   createAnswers,
   updateEntry,
   createMeals,
+  requestJournalAiInsight,
   type WorkoutType,
   type JournalQuestion,
   type MealType,
 } from "../../src/api";
 import { TimeInput } from "../../src/components/TimeInput";
-import { MoodScoreInput } from "../../src/components/MoodScoreInput";
+import { MoodScoreInput, RpeInput } from "../../src/components/MoodScoreInput";
 import { QuestionsSection } from "../../src/components/QuestionsSection";
+import { AppButton, BottomNav, FormSection, PageHeader, PressableCard } from "../../src/components/AppChrome";
+import { OtherNotes } from "../../src/components/OtherNotes";
+import { colors, font, input, layout, space } from "../../src/theme";
 import { normalizeTime, validateMoodScore } from "../../src/utils/timeValidation";
 import { todayLocalDateString } from "../../src/utils/date";
+import {
+  getPhaseLabels,
+  getPreQuestions,
+  isPhasedJournalName,
+} from "../../src/utils/journalPhases";
+import { useKeyboardVisible } from "../../src/hooks/useKeyboardVisible";
 
 export default function NewJournalEntryScreen() {
   const router = useRouter();
@@ -41,8 +50,11 @@ export default function NewJournalEntryScreen() {
   const [questions, setQuestions] = useState<JournalQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [moodScore, setMoodScore] = useState<string>("");
+  const [rpeScore, setRpeScore] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
   const [amPm, setAmPm] = useState<"AM" | "PM">("AM");
   const [timeString, setTimeString] = useState<string>("");
+  const isKeyboardVisible = useKeyboardVisible();
   const [meals, setMeals] = useState<
     Record<MealType, { food: string; feeling: string }>
   >({
@@ -74,6 +86,10 @@ export default function NewJournalEntryScreen() {
     try {
       setSelectedType(type);
       setLoading(true);
+      setNotes("");
+      setMoodScore("");
+      setRpeScore(null);
+      setTimeString("");
 
       const isFood =
         type.name.toLowerCase().includes("food") ||
@@ -122,10 +138,12 @@ export default function NewJournalEntryScreen() {
         return;
       }
 
-      // Validate mood score
+      const isPhasedStart = isPhasedJournalName(selectedType.name);
+
+      // Validate mood after the session, not during a pre-session journal.
       const numericMood = validateMoodScore(moodScore);
-      if (numericMood === null) {
-        Alert.alert("Error", "Please enter your mood score (1–10) before saving.");
+      if (!isPhasedStart && numericMood === null) {
+        Alert.alert("Error", "Please enter your mood score (1-10) before saving.");
         setSaving(false);
         return;
       }
@@ -138,6 +156,7 @@ export default function NewJournalEntryScreen() {
         entry_date: isoDate,
         title: selectedType.name,
         entry_time: normalizedTime,
+        notes: isPhasedStart ? null : notes.trim() || null,
       });
 
       if (isFoodType) {
@@ -164,7 +183,10 @@ export default function NewJournalEntryScreen() {
         }
       } else {
         // Save question answers for non-food entries
-        const nonEmptyAnswers = questions
+        const preSessionQuestions = getPreQuestions(questions);
+        const questionsToSave =
+          isPhasedStart && preSessionQuestions.length ? preSessionQuestions : questions;
+        const nonEmptyAnswers = questionsToSave
           .map((q) => ({
             question_id: q.id,
             text: (answers[q.id] || "").trim(),
@@ -182,9 +204,21 @@ export default function NewJournalEntryScreen() {
         }
       }
 
-      await updateEntry(entry.id, { mood_score: numericMood });
+      if (numericMood !== null || rpeScore !== null) {
+        await updateEntry(entry.id, { mood_score: numericMood, rpe_score: rpeScore });
+      }
 
-      Alert.alert("Saved", "Your new entry has been created.");
+      await requestJournalAiInsight(entry.id).catch((error) => {
+        console.warn("Failed to request journal AI insight:", error);
+      });
+
+      const phaseLabels = getPhaseLabels(selectedType.name);
+      Alert.alert(
+        "Saved",
+        isPhasedStart
+          ? `${phaseLabels.pre} journal started.`
+          : "Your new entry has been created."
+      );
       router.replace("/journal");
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Failed to create entry");
@@ -195,462 +229,174 @@ export default function NewJournalEntryScreen() {
 
   const isFoodType =
     selectedType ? selectedType.name.toLowerCase().includes("food") : false;
+  const isPhasedType = isPhasedJournalName(selectedType?.name);
+  const phaseLabels = getPhaseLabels(selectedType?.name);
+  const preQuestions = getPreQuestions(questions);
+  const visibleQuestions = isPhasedType && preQuestions.length ? preQuestions : questions;
 
   if (loading && step === "type") {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color="#38bdf8" />
+        <ActivityIndicator color={colors.accentSolid} />
       </View>
     );
   }
 
+  const headerSubtitle =
+    step === "type"
+      ? "Choose a session type"
+      : isPhasedType
+      ? `${phaseLabels.pre} now. Finish after ${phaseLabels.session}.`
+      : isFoodType
+      ? "Skip meals you did not have."
+      : undefined;
+
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerText}>
-          <Text style={styles.heading}>New Entry</Text>
-          <Text style={styles.subheading}>
-            {step === "type" ? "Choose a session type" : selectedType?.name}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={layout.page}>
+      <PageHeader
+        title={
+          step === "type"
+            ? "New Entry"
+            : isPhasedType
+            ? `Start ${selectedType?.name} Journal`
+            : selectedType?.name || "New Entry"
+        }
+        subtitle={headerSubtitle}
+        onBack={() => router.back()}
+      />
 
-      {step === "questions" && (
-        <Text style={styles.helperText}>
-          {isFoodType
-            ? "Use these prompts to log what you ate and how it made you feel. You don’t have to answer every question."
-            : "Answer as many prompts as you like — you don’t need to fill out every question."}
-        </Text>
-      )}
-
-      {step === "type" ? (
-        <ScrollView 
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator
           onScrollBeginDrag={Keyboard.dismiss}
         >
-          {workoutTypes.map((type) => (
-            <TouchableOpacity
-              key={type.id}
-              style={styles.typeCard}
-              onPress={() => handleSelectType(type)}
-            >
-              <Text style={styles.typeName}>{type.name}</Text>
-              {type.description ? (
-                <Text style={styles.typeDescription}>{type.description}</Text>
-              ) : null}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        ) : (
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="always"
-            showsVerticalScrollIndicator={true}
-            scrollEnabled={true}
-            nestedScrollEnabled={true}
-          >
-            {!isFoodType && (
-              <TimeInput
-                timeString={timeString}
-                amPm={amPm}
-                onTimeChange={setTimeString}
-                onAmPmChange={setAmPm}
+          {step === "type" ? (
+            workoutTypes.map((type) => (
+              <PressableCard
+                key={type.id}
+                title={type.name}
+                subtitle={type.description || undefined}
+                onPress={() => handleSelectType(type)}
               />
-            )}
-
-            <MoodScoreInput
-              moodScore={moodScore}
-              onMoodChange={setMoodScore}
-              isFoodType={isFoodType}
-            />
-
-          {isFoodType ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Meals</Text>
-              <Text style={styles.mealsHelperText}>
-                Use the cards below to log what you ate for each meal and how it
-                made you feel.
-              </Text>
-
-              {(["Breakfast", "Lunch", "Snack", "Dinner"] as MealType[]).map(
-                (mealType) => (
-                  <View key={mealType} style={styles.mealCard}>
-                    <View style={styles.mealHeader}>
-                      <Text style={styles.mealTitle}>{mealType}</Text>
-                      <Text style={styles.mealPlus}>+</Text>
-                    </View>
-                    <TextInput
-                      style={styles.mealFoodInput}
-                      multiline
-                      placeholder="What did you eat?"
-                      placeholderTextColor="#64748b"
-                      value={meals[mealType].food}
-                      onChangeText={(text) =>
-                        setMeals((prev) => ({
-                          ...prev,
-                          [mealType]: { ...prev[mealType], food: text },
-                        }))
-                      }
-                    />
-                    <TextInput
-                      style={styles.mealFeelingInput}
-                      multiline
-                      placeholder="How did it make you feel? (optional)"
-                      placeholderTextColor="#64748b"
-                      value={meals[mealType].feeling}
-                      onChangeText={(text) =>
-                        setMeals((prev) => ({
-                          ...prev,
-                          [mealType]: { ...prev[mealType], feeling: text },
-                        }))
-                      }
-                    />
-                  </View>
-                )
-              )}
-            </View>
+            ))
           ) : (
-            <QuestionsSection
-              questions={questions}
-              answers={answers}
-              onAnswerChange={(questionId, text) =>
-                setAnswers((prev) => ({
-                  ...prev,
-                  [questionId]: text,
-                }))
-              }
-            />
-          )}
-          </ScrollView>
-        )}
+            <>
+              {!isFoodType && (
+                <TimeInput
+                  timeString={timeString}
+                  amPm={amPm}
+                  onTimeChange={setTimeString}
+                  onAmPmChange={setAmPm}
+                />
+              )}
 
-        {step === "questions" && (
-          <>
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save Entry"}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.footerButtons}>
-              <TouchableOpacity
-                style={styles.bottomIconButton}
-                onPress={() => router.push("/")}
-              >
-                <Ionicons name="home" size={28} color="#3b82f6" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.bottomIconButton}
-                onPress={() => router.push("/calendar")}
-              >
-                <View style={styles.calendarInner}>
-                  <View style={styles.calendarHeader} />
-                  <View style={styles.calendarBody} />
-                </View>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-      </View>
-    </TouchableWithoutFeedback>
+              {!isPhasedType && (
+                <>
+                  <MoodScoreInput
+                    moodScore={moodScore}
+                    onMoodChange={setMoodScore}
+                    isFoodType={isFoodType}
+                  />
+                  {!isFoodType && <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />}
+                </>
+              )}
+
+              {isFoodType ? (
+                <>
+                  <FormSection title="Meals" hint="One block per meal. Skip any you did not have.">
+                    {(["Breakfast", "Lunch", "Snack", "Dinner"] as MealType[]).map((mealType, index, arr) => (
+                      <View key={mealType} style={[styles.mealBlock, index < arr.length - 1 && styles.mealBlockBorder]}>
+                        <Text style={styles.mealLabel}>{mealType}</Text>
+                        <TextInput
+                          style={styles.mealInput}
+                          multiline
+                          scrollEnabled={false}
+                          placeholder="What did you eat?"
+                          placeholderTextColor={colors.faint}
+                          value={meals[mealType].food}
+                          onChangeText={(text) =>
+                            setMeals((prev) => ({ ...prev, [mealType]: { ...prev[mealType], food: text } }))
+                          }
+                        />
+                        <TextInput
+                          style={styles.mealInput}
+                          multiline
+                          scrollEnabled={false}
+                          placeholder="How did it feel? (optional)"
+                          placeholderTextColor={colors.faint}
+                          value={meals[mealType].feeling}
+                          onChangeText={(text) =>
+                            setMeals((prev) => ({ ...prev, [mealType]: { ...prev[mealType], feeling: text } }))
+                          }
+                        />
+                      </View>
+                    ))}
+                  </FormSection>
+                  <OtherNotes value={notes} onChangeText={setNotes} />
+                </>
+              ) : (
+                <>
+                  <QuestionsSection
+                    title={isPhasedType ? `${phaseLabels.pre} questions` : "Questions"}
+                    questions={visibleQuestions}
+                    answers={answers}
+                    onAnswerChange={(questionId, text) =>
+                      setAnswers((prev) => ({ ...prev, [questionId]: text }))
+                    }
+                  />
+                  {!isPhasedType && <OtherNotes value={notes} onChangeText={setNotes} />}
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {step === "questions" && !isKeyboardVisible && (
+        <>
+          <View style={styles.footer}>
+            <AppButton
+              label={saving ? "Saving..." : isPhasedType ? "Start Journal" : "Save Entry"}
+              onPress={handleSave}
+              disabled={saving}
+            />
+          </View>
+          <BottomNav onHome={() => router.push("/")} onCalendar={() => router.push("/calendar")} />
+        </>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    paddingTop: 60,
-    paddingHorizontal: 24,
-  },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
+  content: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: space.lg },
+  mealBlock: { gap: space.sm, paddingBottom: space.lg },
+  mealBlockBorder: {
+    marginBottom: space.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle,
   },
-  headerText: {
-    flexShrink: 1,
-    flex: 1,
-    paddingRight: 12,
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#e5e7eb",
-  },
-  subheading: {
-    fontSize: 14,
-    color: "#9ca3af",
-    marginTop: 4,
-  },
-  backText: {
-    fontSize: 14,
-    color: "#38bdf8",
-    fontWeight: "600",
-  },
-  helperText: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginBottom: 16,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  typeCard: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-  },
-  typeName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 4,
-  },
-  typeDescription: {
-    fontSize: 13,
-    color: "#9ca3af",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 12,
-  },
-  qaCard: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-  },
-  questionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    marginBottom: 8,
-  },
-  answerInput: {
-    backgroundColor: "#020617",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#e5e7eb",
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
-  timeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  timeInputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    gap: 4,
-  },
-  timeInput: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    textAlign: "center",
-    minWidth: 40,
-    paddingVertical: 4,
-  },
-  timeSeparator: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  amPmToggle: {
-    flexDirection: "row",
-    backgroundColor: "#020617",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    overflow: "hidden",
-  },
-  amPmOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  amPmOptionSelected: {
-    backgroundColor: "#0b1120",
-    borderColor: "#38bdf8",
-  },
-  amPmText: {
-    fontSize: 14,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  amPmTextSelected: {
-    color: "#e5e7eb",
-    fontWeight: "700",
-  },
-  moodHelperText: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginBottom: 8,
-  },
-  moodScrollContent: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  moodOption: {
-    minWidth: 40,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    marginRight: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-  moodOptionSelected: {
-    borderColor: "#38bdf8",
-    backgroundColor: "#0b1120",
-  },
-  moodOptionText: {
-    fontSize: 16,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  moodOptionTextSelected: {
-    color: "#e5e7eb",
-    fontWeight: "700",
-  },
-  mealsHelperText: {
-    fontSize: 13,
-    color: "#9ca3af",
-    marginBottom: 12,
-  },
-  mealCard: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-  },
-  mealHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  mealTitle: {
+  mealLabel: {
+    fontFamily: font,
     fontSize: 15,
     fontWeight: "600",
-    color: "#e5e7eb",
+    color: colors.text,
   },
-  mealPlus: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#38bdf8",
-  },
-  mealFoodInput: {
-    backgroundColor: "#020617",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: "#e5e7eb",
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    marginBottom: 8,
-  },
-  mealFeelingInput: {
-    backgroundColor: "#020617",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: "#e5e7eb",
-    borderWidth: 1,
-    borderColor: "#1e293b",
-  },
-  footer: {
-    paddingVertical: 16,
-    paddingBottom: 24,
-  },
-  saveButton: {
-    backgroundColor: "#38bdf8",
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#020617",
-  },
-  footerButtons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
-    paddingVertical: 12,
-    paddingBottom: 20,
-  },
-  bottomIconButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-  calendarInner: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: "#3b82f6",
-    overflow: "hidden",
-  },
-  calendarHeader: {
-    height: 10,
-    backgroundColor: "#3b82f6",
-  },
-  calendarBody: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
+  mealInput: { ...input, minHeight: 72, fontFamily: font, lineHeight: 24 },
+  footer: { paddingTop: space.md, paddingBottom: space.sm },
 });

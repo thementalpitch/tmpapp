@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -20,28 +21,37 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Image,
   ScrollView,
   Animated,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "../contexts/AuthContext";
+import { FirstRunTutorial } from "./FirstRunTutorial";
+import { colors, radius, font, button, type as typeStyles } from "../theme";
 
 type AuthMode = "signin" | "signup";
+
+const TUTORIAL_COMPLETE_KEY = "mentalPitch.hasCompletedTutorial.v1";
 
 export function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hasCompletedTutorial, setHasCompletedTutorial] = useState<boolean | null>(null);
   const { signIn, signUp } = useAuth();
 
-  // Entrance + idle animations
+  // Quiet entrance animation keeps the auth form from feeling abrupt.
   const logoScale = useRef(new Animated.Value(0.9)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoFloat = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentTranslateY = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    AsyncStorage.getItem(TUTORIAL_COMPLETE_KEY)
+      .then((value) => setHasCompletedTutorial(value === "true"))
+      .catch(() => setHasCompletedTutorial(false));
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -70,22 +80,7 @@ export function AuthScreen() {
       }),
     ]).start();
 
-    // Subtle idle float for logo
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoFloat, {
-          toValue: 1,
-          duration: 2600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoFloat, {
-          toValue: 0,
-          duration: 2600,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [logoOpacity, logoScale, contentOpacity, contentTranslateY, logoFloat]);
+  }, [logoOpacity, logoScale, contentOpacity, contentTranslateY]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -142,6 +137,20 @@ export function AuthScreen() {
     }
   };
 
+  const completeTutorial = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setHasCompletedTutorial(true);
+    AsyncStorage.setItem(TUTORIAL_COMPLETE_KEY, "true").catch(() => {});
+  };
+
+  if (hasCompletedTutorial === null) {
+    return <View style={styles.container} />;
+  }
+
+  if (!hasCompletedTutorial) {
+    return <FirstRunTutorial onComplete={completeTutorial} />;
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -163,19 +172,11 @@ export function AuthScreen() {
         >
           <View style={styles.logoContainer}>
             <Animated.Image
-              source={require("../../assets/images/app_logo.png")}
+              source={require("../../assets/images/mental_pitch_logo.png")}
               style={[
                 styles.logo,
                 {
-                  transform: [
-                    { scale: logoScale },
-                    {
-                      translateY: logoFloat.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -6],
-                      }),
-                    },
-                  ],
+                  transform: [{ scale: logoScale }],
                   opacity: logoOpacity,
                 },
               ]}
@@ -237,7 +238,7 @@ export function AuthScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
-                placeholderTextColor="#475569"
+                placeholderTextColor={colors.muted}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -253,7 +254,7 @@ export function AuthScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="••••••••"
-                placeholderTextColor="#475569"
+                placeholderTextColor={colors.muted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -270,7 +271,7 @@ export function AuthScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#020617" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
                 <Text style={styles.buttonText}>
                   {mode === "signin" ? "Sign In" : "Create Account"}
@@ -287,7 +288,7 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: colors.bg,
   },
   scrollContent: {
     flexGrow: 1,
@@ -311,48 +312,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#e5e7eb",
+    ...typeStyles.pageTitle,
     marginBottom: 8,
-    letterSpacing: -0.5,
+    textAlign: "center",
   },
   subtitle: {
-    fontSize: 15,
-    color: "#94a3b8",
+    ...typeStyles.body,
     textAlign: "center",
-    lineHeight: 22,
   },
   tabs: {
     flexDirection: "row",
     marginBottom: 28,
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     padding: 4,
     borderWidth: 1,
-    borderColor: "#1e293b",
+    borderColor: colors.border,
   },
   tab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   tabActive: {
-    backgroundColor: "#38bdf8",
-    shadowColor: "#38bdf8",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: colors.accentSolid,
   },
   tabText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#64748b",
+    fontFamily: font,
+    fontSize: 15,
+    fontWeight: "500",
+    color: colors.faint,
   },
   tabTextActive: {
-    color: "#020617",
+    color: colors.onPrimary,
+    fontWeight: "600",
   },
   form: {
     gap: 20,
@@ -361,41 +355,27 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#e5e7eb",
-    letterSpacing: 0.2,
+    ...typeStyles.label,
+    color: colors.text,
   },
   input: {
-    backgroundColor: "#0f172a",
-    borderRadius: 12,
-    paddingHorizontal: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 17,
-    color: "#e5e7eb",
-    borderWidth: 1.5,
-    borderColor: "#1e293b",
+    fontFamily: font,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   button: {
-    backgroundColor: "#38bdf8",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
+    ...button.base,
+    ...button.primary,
     marginTop: 8,
-    shadowColor: "#38bdf8",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
   },
   buttonDisabled: {
-    opacity: 0.6,
-    shadowOpacity: 0.2,
+    opacity: 0.5,
   },
-  buttonText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#020617",
-    letterSpacing: 0.3,
-  },
+  buttonText: button.primaryText,
 });
