@@ -65,6 +65,91 @@ export async function getQuestionsByWorkoutType(
 }
 
 /**
+ * Get the current user's hidden question IDs.
+ * Used to filter questions the user chose to hide in settings.
+ */
+export async function getHiddenQuestionIds(): Promise<string[]> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("user_hidden_questions")
+    .select("question_id");
+
+  if (error) {
+    throw handleSupabaseError(error);
+  }
+
+  return (data || []).map((row) => row.question_id as string);
+}
+
+/**
+ * Hide a question for the current user. The question (and any answers
+ * already written to it) is preserved; it just stops appearing in journals.
+ * RLS scopes the row to the current user.
+ */
+export async function hideQuestion(questionId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("You must be signed in to customize questions.");
+  }
+
+  const { error } = await supabase.from("user_hidden_questions").upsert(
+    { user_id: user.id, question_id: questionId },
+    { onConflict: "user_id,question_id" }
+  );
+
+  if (error) {
+    throw handleSupabaseError(error);
+  }
+}
+
+/**
+ * Re-enable a hidden question for the current user.
+ */
+export async function unhideQuestion(questionId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("user_hidden_questions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("question_id", questionId);
+
+  if (error) {
+    throw handleSupabaseError(error);
+  }
+}
+
+/**
+ * Get questions for a workout type, excluding ones the current user hid.
+ * This is what journal screens render.
+ */
+export async function getVisibleQuestionsByWorkoutType(
+  workoutTypeId: string
+): Promise<JournalQuestion[]> {
+  const [questions, hiddenIds] = await Promise.all([
+    getQuestionsByWorkoutType(workoutTypeId),
+    getHiddenQuestionIds().catch(() => [] as string[]),
+  ]);
+
+  if (hiddenIds.length === 0) {
+    return questions;
+  }
+
+  const hidden = new Set(hiddenIds);
+  return questions.filter((question) => !hidden.has(question.id));
+}
+
+/**
  * Get questions with workout type names (for display).
  * 
  * Architecture Note: Join query to avoid N+1 when displaying question lists.
