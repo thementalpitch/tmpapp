@@ -70,6 +70,15 @@ export interface JournalQuestionUpdate {
   sort_order?: number;
 }
 
+// Per-user question visibility (user_hidden_questions table).
+// Hiding preserves the question and its answers; it just stops appearing
+// in that user's journals until re-enabled.
+export interface UserHiddenQuestion {
+  user_id: UUID;
+  question_id: UUID;
+  hidden_at: string;
+}
+
 // ============================================================================
 // Journal Entries
 // ============================================================================
