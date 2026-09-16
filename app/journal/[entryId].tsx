@@ -14,7 +14,7 @@ import {
   getEntryWithAnswers,
   updateEntry,
   updateAnswer,
-  getQuestionsByWorkoutType,
+  getVisibleQuestionsByWorkoutType,
   createAnswers,
   deleteEntry,
   getJournalAiInsight,
@@ -134,7 +134,7 @@ export default function JournalEntryDetail() {
         // Load questions for this workout type so UI matches new-entry screen
         let qs: JournalQuestion[] = [];
         if (data.workout_type_id) {
-          qs = await getQuestionsByWorkoutType(data.workout_type_id);
+          qs = await getVisibleQuestionsByWorkoutType(data.workout_type_id);
         }
         setQuestions(qs);
 
