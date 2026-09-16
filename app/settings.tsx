@@ -262,6 +262,23 @@ export default function Settings() {
         </Section>
 
         <Section>
+          <SectionTitle>Journal questions</SectionTitle>
+          <Card>
+            <Text style={typeStyles.cardTitle}>Customize questions</Text>
+            <Text style={typeStyles.caption}>
+              Choose which questions appear in each journal, or add your own.
+            </Text>
+            <View style={styles.notificationActions}>
+              <AppButton
+                label="Customize questions"
+                onPress={() => router.push("/settings/questions")}
+                variant="secondary"
+              />
+            </View>
+          </Card>
+        </Section>
+
+        <Section>
           <SectionTitle>Notifications</SectionTitle>
           {loadingNotifications ? (
             <ActivityIndicator color={colors.accent} />
