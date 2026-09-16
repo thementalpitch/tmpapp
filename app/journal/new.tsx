@@ -14,7 +14,7 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   getWorkoutTypes,
-  getQuestionsByWorkoutType,
+  getVisibleQuestionsByWorkoutType,
   createEntry,
   createAnswers,
   updateEntry,
@@ -109,7 +109,7 @@ export default function NewJournalEntryScreen() {
         return;
       }
 
-      const qs = await getQuestionsByWorkoutType(type.id);
+      const qs = await getVisibleQuestionsByWorkoutType(type.id);
       setQuestions(qs);
       // Initialize answers map (non-food)
       const initial: Record<string, string> = {};
