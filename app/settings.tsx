@@ -307,7 +307,14 @@ export default function Settings() {
               ) : null}
 
               <View style={styles.scheduleHeader}>
-                <Text style={typeStyles.label}>Weekly schedule</Text>
+                <View style={styles.scheduleTitleRow}>
+                  <Text style={typeStyles.label}>Weekly schedule</Text>
+                  <View style={styles.countPill}>
+                    <Text style={styles.countPillText}>
+                      {DAYS.filter((_, i) => dailyReminderTimes[String(i)]).length} of 7 on
+                    </Text>
+                  </View>
+                </View>
                 <Text style={typeStyles.caption}>Set a different time for each day.</Text>
               </View>
               <View style={styles.scheduleList}>
@@ -322,15 +329,8 @@ export default function Settings() {
                         index < DAYS.length - 1 && styles.scheduleRowBorder,
                       ]}
                     >
-                      <Switch
-                        value={selected}
-                        onValueChange={() => toggleDay(index)}
-                        trackColor={{ false: colors.border, true: colors.accentStrong }}
-                        thumbColor={colors.white}
-                        accessibilityLabel={`${day.name} reminders`}
-                      />
                       <Text style={[styles.dayLabel, !selected && styles.dayLabelDisabled]}>
-                        {day.label}
+                        {day.name}
                       </Text>
                       {selected ? (
                         <TimePicker
@@ -344,8 +344,17 @@ export default function Settings() {
                           }
                         />
                       ) : (
-                        <Text style={styles.dayOff}>Off</Text>
+                        <View style={styles.offChip}>
+                          <Text style={styles.offChipText}>Off</Text>
+                        </View>
                       )}
+                      <Switch
+                        value={selected}
+                        onValueChange={() => toggleDay(index)}
+                        trackColor={{ false: colors.border, true: colors.accentStrong }}
+                        thumbColor={colors.white}
+                        accessibilityLabel={`${day.name} reminders`}
+                      />
                     </View>
                   );
                 })}
@@ -395,6 +404,25 @@ const styles = StyleSheet.create({
   },
   settingCopy: { flex: 1, paddingRight: 8, gap: 4 },
   scheduleHeader: { gap: space.xs, marginTop: space.lg, marginBottom: space.sm },
+  scheduleTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  countPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentMuted,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  countPillText: {
+    fontFamily: font,
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.accent,
+  },
   scheduleList: {
     borderRadius: radius.md,
     borderWidth: 1,
@@ -402,20 +430,34 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   scheduleRow: {
-    minHeight: 64,
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
-    gap: space.sm,
-    paddingHorizontal: space.md,
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
     backgroundColor: colors.surfaceRaised,
   },
   scheduleRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderSubtle,
   },
-  dayLabel: { flex: 1, fontFamily: font, fontSize: 15, fontWeight: "600", color: colors.text },
+  dayLabel: { flex: 1, fontFamily: font, fontSize: 16, fontWeight: "600", color: colors.text },
   dayLabelDisabled: { color: colors.muted },
-  dayOff: { fontFamily: font, fontSize: 14, color: colors.faint, paddingRight: space.sm },
+  offChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  offChipText: {
+    fontFamily: font,
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.faint,
+  },
   notificationActions: { marginTop: space.sm },
   dangerHint: {
     fontFamily: font,
