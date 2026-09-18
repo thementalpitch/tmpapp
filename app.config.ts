@@ -6,7 +6,7 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "The Mental Pitch",
   slug: "the-mental-pitch",
-  version: "1.1.7",
+  version: "1.1.8",
   orientation: "portrait",
   scheme: "thementalpitch",
   platforms: ["ios", "android", "web"],
@@ -30,7 +30,7 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: "com.mentalpitch.app",
-    buildNumber: "28",
+    buildNumber: "29",
     supportsTablet: true,
     requireFullScreen: false,
     infoPlist: {
