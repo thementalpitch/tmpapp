@@ -48,7 +48,7 @@ const config: ExpoConfig = {
     versionCode: 1,
     adaptiveIcon: {
       foregroundImage: "./assets/images/mental_pitch_logo.png",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#203040",
     },
   },
   extra: {
