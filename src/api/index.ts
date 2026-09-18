@@ -19,7 +19,6 @@ export * from "./journalQuestions";
 export * from "./journalEntries";
 export * from "./journalAnswers";
 export * from "./foodMeals";
-export * from "./journalAiInsights";
 export * from "./profiles";
 export * from "./stats";
 export * from "./notificationPreferences";

@@ -17,9 +17,6 @@ import {
   getVisibleQuestionsByWorkoutType,
   createAnswers,
   deleteEntry,
-  getJournalAiInsight,
-  requestJournalAiInsight,
-  type JournalAiInsight,
   type JournalEntryWithAnswers,
   type JournalQuestion,
 } from "../../src/api";
@@ -27,7 +24,6 @@ import { TimeInput } from "../../src/components/TimeInput";
 import { MoodScoreInput, RpeInput } from "../../src/components/MoodScoreInput";
 import { QuestionsSection } from "../../src/components/QuestionsSection";
 import { AppButton, BottomNav, ButtonRow, PageHeader } from "../../src/components/AppChrome";
-import { AiInsightCards } from "../../src/components/JournalAiInsight";
 import { colors, layout, space } from "../../src/theme";
 import { OtherNotes } from "../../src/components/OtherNotes";
 import { normalizeTime, validateMoodScore } from "../../src/utils/timeValidation";
@@ -56,7 +52,6 @@ export default function JournalEntryDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<JournalEntryWithAnswers | null>(null);
-  const [aiInsight, setAiInsight] = useState<JournalAiInsight | null>(null);
   const [questions, setQuestions] = useState<JournalQuestion[]>([]);
   const [answerTexts, setAnswerTexts] = useState<Record<string, string>>({});
   const [moodScore, setMoodScore] = useState<string>("");
@@ -112,7 +107,6 @@ export default function JournalEntryDetail() {
 
         // Load entry + answers
         const data = await getEntryWithAnswers(entryId as string);
-        setAiInsight(await getJournalAiInsight(entryId as string).catch(() => null));
         setEntry(data);
         setMoodScore(data.mood_score != null ? String(data.mood_score) : "");
         setRpeScore(data.rpe_score);
@@ -227,10 +221,6 @@ export default function JournalEntryDetail() {
         }
       }
 
-      await requestJournalAiInsight(entry.id).catch((error) => {
-        console.warn("Failed to request journal AI insight:", error);
-      });
-
       Alert.alert("Saved", isFinishingPhase ? "Journal finished." : "Your updates have been saved.");
       router.back();
     } catch (err: any) {
@@ -318,8 +308,6 @@ export default function JournalEntryDetail() {
             onMoodChange={setMoodScore}
           />
           {!isFoodEntry && <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />}
-
-          <AiInsightCards insight={aiInsight} />
 
           {isPhasedEntry && !isFinishingPhase && hasPhasedQuestions ? (
             <>

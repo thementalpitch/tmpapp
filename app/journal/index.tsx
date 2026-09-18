@@ -6,12 +6,9 @@ import { useAuth } from "../../src/contexts/AuthContext";
 import { formatDateLocal, parseISODateLocal, todayLocalDateString } from "../../src/utils/date";
 import {
   getEntriesByDate,
-  getJournalAiInsightsByEntryIds,
-  type JournalAiInsight,
   type JournalEntry,
 } from "../../src/api";
 import { AppButton, BottomNav, EmptyState, Page, PageHeader } from "../../src/components/AppChrome";
-import { AiInsightButton, AiInsightModal } from "../../src/components/JournalAiInsight";
 import { MoodRing } from "../../src/components/MoodRing";
 import { card, colors, font, radius, space, type as typeStyles } from "../../src/theme";
 import { isPhasedJournalName } from "../../src/utils/journalPhases";
@@ -36,8 +33,6 @@ export default function JournalScreen() {
   const { date } = useLocalSearchParams<{ date?: string }>();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [insightsByEntryId, setInsightsByEntryId] = useState<Record<string, JournalAiInsight>>({});
-  const [selectedInsight, setSelectedInsight] = useState<JournalAiInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const targetDateStr = typeof date === "string" ? date : todayLocalDateString();
@@ -50,9 +45,6 @@ export default function JournalScreen() {
       setError(null);
       const nextEntries = await getEntriesByDate(targetDateStr);
       setEntries(nextEntries);
-      setInsightsByEntryId(
-        await getJournalAiInsightsByEntryIds(nextEntries.map((entry) => entry.id)).catch(() => ({}))
-      );
     } catch (err: any) {
       setError(err?.message || "Failed to load entries");
     } finally {
@@ -64,7 +56,6 @@ export default function JournalScreen() {
 
   const renderItem = ({ item }: { item: JournalEntry }) => {
     const needsFinish = isPhasedJournalName(item.title) && item.mood_score == null;
-    const insight = insightsByEntryId[item.id];
     return (
       <TouchableOpacity style={styles.card} onPress={() => router.push(`/journal/${item.id}`)} activeOpacity={0.72}>
         <View style={styles.cardTop}>
@@ -86,7 +77,6 @@ export default function JournalScreen() {
               </Text>
             ) : null}
           </View>
-          {insight ? <AiInsightButton insight={insight} onPress={setSelectedInsight} /> : null}
           {item.mood_score != null && <MoodRing score={item.mood_score} size="sm" />}
         </View>
       </TouchableOpacity>
@@ -128,11 +118,6 @@ export default function JournalScreen() {
         onHome={() => router.push("/")}
         onAdd={() => router.push(newPath)}
         onCalendar={() => router.push("/calendar")}
-      />
-      <AiInsightModal
-        insight={selectedInsight}
-        visible={selectedInsight !== null}
-        onClose={() => setSelectedInsight(null)}
       />
     </Page>
   );

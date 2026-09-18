@@ -19,7 +19,6 @@ import {
   createAnswers,
   updateEntry,
   createMeals,
-  requestJournalAiInsight,
   type WorkoutType,
   type JournalQuestion,
   type MealType,
@@ -207,10 +206,6 @@ export default function NewJournalEntryScreen() {
       if (numericMood !== null || rpeScore !== null) {
         await updateEntry(entry.id, { mood_score: numericMood, rpe_score: rpeScore });
       }
-
-      await requestJournalAiInsight(entry.id).catch((error) => {
-        console.warn("Failed to request journal AI insight:", error);
-      });
 
       const phaseLabels = getPhaseLabels(selectedType.name);
       Alert.alert(

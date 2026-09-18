@@ -237,24 +237,6 @@ export interface DailyMoodAverage {
 }
 
 // ============================================================================
-// Journal AI Insights
-// ============================================================================
-
-export interface JournalAiInsight {
-  entry_id: UUID;
-  user_id: UUID;
-  status: "pending" | "processing" | "complete" | "error";
-  experience: string | null;
-  tips: string[];
-  model: string | null;
-  requested_at: string;
-  generated_at: string | null;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// ============================================================================
 // Statistics Types
 // ============================================================================
 
