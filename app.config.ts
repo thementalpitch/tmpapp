@@ -4,7 +4,7 @@
 import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
-  name: "The MentalPitch",
+  name: "The Mental Pitch",
   slug: "the-mental-pitch",
   version: "1.1.7",
   orientation: "portrait",
@@ -19,9 +19,9 @@ const config: ExpoConfig = {
       "expo-speech-recognition",
       {
         microphonePermission:
-          "Allow The MentalPitch to use your microphone for spoken journal answers.",
+          "Allow The Mental Pitch to use your microphone for spoken journal answers.",
         speechRecognitionPermission:
-          "Allow The MentalPitch to turn spoken journal answers into text.",
+          "Allow The Mental Pitch to turn spoken journal answers into text.",
       },
     ],
   ],
@@ -36,11 +36,11 @@ const config: ExpoConfig = {
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSMicrophoneUsageDescription:
-        "Allow The MentalPitch to use your microphone for spoken journal answers.",
+        "Allow The Mental Pitch to use your microphone for spoken journal answers.",
       NSSpeechRecognitionUsageDescription:
-        "Allow The MentalPitch to turn spoken journal answers into text.",
+        "Allow The Mental Pitch to turn spoken journal answers into text.",
       NSPhotoLibraryUsageDescription:
-        "Allow The MentalPitch to access photos you choose to share with the app."
+        "Allow The Mental Pitch to access photos you choose to share with the app."
     }
   },
   android: {
