@@ -172,7 +172,7 @@ export function AuthScreen() {
         >
           <View style={styles.logoContainer}>
             <Animated.Image
-              source={require("../../assets/images/mental_pitch_logo.png")}
+              source={require("../../assets/images/mental_pitch_logo_transparent.png")}
               style={[
                 styles.logo,
                 {

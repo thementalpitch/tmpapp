@@ -11,7 +11,7 @@ export function LoadingScreen({ message }: LoadingScreenProps) {
     <View style={styles.container}>
       <StatusBar style="light" />
       <Image
-        source={require("../../assets/images/mental_pitch_logo.png")}
+        source={require("../../assets/images/mental_pitch_logo_transparent.png")}
         style={styles.logo}
         resizeMode="contain"
       />
