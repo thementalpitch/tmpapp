@@ -30,7 +30,7 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: "com.mentalpitch.app",
-    buildNumber: "32",
+    buildNumber: "33",
     supportsTablet: true,
     requireFullScreen: false,
     infoPlist: {
