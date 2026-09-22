@@ -17,7 +17,7 @@ import { AppButton } from "./AppChrome";
 import { colors, font, radius, space, type as typeStyles } from "../theme";
 import { openOnrise } from "../utils/onrise";
 
-const TUTORIAL_PAGES = 4;
+const TUTORIAL_PAGES = 6;
 
 export function FirstRunTutorial({
   onComplete,
@@ -108,6 +108,39 @@ export function FirstRunTutorial({
 
         <TutorialPage
           width={width}
+          title="Make it yours"
+          body="Hide questions you don't need or add your own. Open Customize questions in Settings to shape each journal."
+        >
+          <View style={styles.customizeVisual}>
+            <View style={styles.customizeRow}>
+              <Text style={styles.customizeQuestion}>What went well today?</Text>
+              <View style={[styles.toggle, styles.toggleOn]}>
+                <View style={styles.knobOn} />
+              </View>
+            </View>
+            <View style={styles.customizeRow}>
+              <Text style={styles.customizeQuestion}>What do you want to focus on?</Text>
+              <View style={[styles.toggle, styles.toggleOn]}>
+                <View style={styles.knobOn} />
+              </View>
+            </View>
+            <View style={styles.customizeRow}>
+              <Text style={[styles.customizeQuestion, styles.customizeHidden]}>
+                Morning routine check-in
+              </Text>
+              <View style={styles.toggle}>
+                <View style={styles.knob} />
+              </View>
+            </View>
+            <View style={styles.addRow}>
+              <Ionicons name="add" size={18} color={colors.accentSolid} />
+              <Text style={styles.addRowText}>Add your own question</Text>
+            </View>
+          </View>
+        </TutorialPage>
+
+        <TutorialPage
+          width={width}
           title="See patterns over time"
           body="The calendar groups entries by day and colors dates using your average mood."
         >
@@ -132,6 +165,29 @@ export function FirstRunTutorial({
                 </View>
               ))}
             </View>
+          </View>
+        </TutorialPage>
+
+        <TutorialPage
+          width={width}
+          title="Daily reminders"
+          body="Turn on journal reminders in Settings and pick a time for each day of the week."
+        >
+          <View style={styles.remindersVisual}>
+            <View style={styles.bellWrap}>
+              <Ionicons name="notifications-outline" size={42} color={colors.accentSolid} />
+            </View>
+            {[
+              ["Mon", "8:00 PM"],
+              ["Wed", "8:00 PM"],
+              ["Fri", "7:30 PM"],
+            ].map(([day, time]) => (
+              <View key={day} style={styles.reminderRow}>
+                <Text style={styles.reminderDay}>{day}</Text>
+                <Text style={styles.reminderTime}>{time}</Text>
+              </View>
+            ))}
+            <Text style={styles.visualCaption}>Set a different time for each day</Text>
           </View>
         </TutorialPage>
 
@@ -300,4 +356,112 @@ const styles = StyleSheet.create({
     padding: space.xxl,
   },
   onriseLogo: { width: 190, height: 92 },
+  customizeVisual: {
+    minHeight: 300,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    padding: space.xl,
+    justifyContent: "center",
+    gap: space.md,
+  },
+  customizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    paddingVertical: space.md,
+    paddingHorizontal: space.md,
+    gap: space.md,
+  },
+  customizeQuestion: {
+    flex: 1,
+    fontFamily: font,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "500",
+    color: colors.text,
+  },
+  customizeHidden: { color: colors.muted },
+  toggle: {
+    width: 46,
+    height: 27,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  toggleOn: { backgroundColor: colors.accentStrong, alignItems: "flex-end" },
+  knob: {
+    width: 21,
+    height: 21,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+  },
+  knobOn: {
+    width: 21,
+    height: 21,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+  },
+  addRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingTop: space.sm,
+  },
+  addRowText: {
+    fontFamily: font,
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.accentSolid,
+  },
+  remindersVisual: {
+    minHeight: 300,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    padding: space.xl,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.md,
+  },
+  bellWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: space.sm,
+  },
+  reminderRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    paddingVertical: space.md,
+    paddingHorizontal: space.md,
+  },
+  reminderDay: {
+    fontFamily: font,
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  reminderTime: {
+    fontFamily: font,
+    fontSize: 15,
+    color: colors.muted,
+  },
 });
