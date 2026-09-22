@@ -16,7 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton } from "./AppChrome";
 import { colors, font, radius, space, type as typeStyles } from "../theme";
 
-const TUTORIAL_PAGES = 6;
+const TUTORIAL_PAGES = 7;
 
 export function FirstRunTutorial({
   onComplete,
@@ -75,6 +75,13 @@ export function FirstRunTutorial({
           imageLabel="Home screen with the Start a journal entry button circled"
           title="Start a journal"
           body="One tap opens a new entry — log a game, training session, or reflection."
+        />
+        <TutorialPage
+          width={width}
+          image={require("../../assets/images/tutorial-activity.png")}
+          imageLabel="New entry screen with the activity type cards circled"
+          title="Pick your activity"
+          body="Choose what you're logging — game, training, rehab, lift, and more."
         />
         <TutorialPage
           width={width}
