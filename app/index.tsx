@@ -41,7 +41,7 @@ export default function Index() {
         <Animated.View style={[styles.content, { opacity: fade }]}>
           <View style={styles.hero}>
             <Animated.Image
-              source={require("../assets/images/mental_pitch_logo.png")}
+              source={require("../assets/images/mental_pitch_logo_transparent.png")}
               style={styles.logo}
               resizeMode="contain"
             />

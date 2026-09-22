@@ -279,6 +279,23 @@ export default function Settings() {
         </Section>
 
         <Section>
+          <SectionTitle>Tutorial</SectionTitle>
+          <Card>
+            <Text style={typeStyles.cardTitle}>Replay tutorial</Text>
+            <Text style={typeStyles.caption}>
+              Walk through the app tour again.
+            </Text>
+            <View style={styles.notificationActions}>
+              <AppButton
+                label="Replay tutorial"
+                onPress={() => router.push("/tutorial")}
+                variant="secondary"
+              />
+            </View>
+          </Card>
+        </Section>
+
+        <Section>
           <SectionTitle>Notifications</SectionTitle>
           {loadingNotifications ? (
             <ActivityIndicator color={colors.accent} />
