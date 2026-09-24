@@ -16,6 +16,7 @@ const menuItems: { label: string; icon: React.ComponentProps<typeof Ionicons>["n
   { label: "Calendar", icon: "calendar-outline", path: "/calendar" },
   { label: "Profile", icon: "person-outline", path: "/profile" },
   { label: "Settings", icon: "settings-outline", path: "/settings" },
+  { label: "Tutorial", icon: "school-outline", path: "/tutorial" },
 ];
 
 export default function Index() {
