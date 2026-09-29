@@ -15,12 +15,16 @@ import { useAuth } from "../../src/contexts/AuthContext";
 import {
   createQuestion,
   getHiddenQuestionIds,
+  getHiddenSliderKeys,
   getQuestionsWithWorkoutTypes,
   getSystemWorkoutTypes,
   hideQuestion,
+  hideSlider,
   unhideQuestion,
+  unhideSlider,
   updateQuestion,
   type JournalQuestionWithWorkoutType,
+  type SliderKey,
   type WorkoutType,
 } from "../../src/api";
 import {
@@ -40,6 +44,13 @@ import {
 
 type PhaseChoice = "pre" | "post";
 
+// The three score sliders that appear on journal entries (and as calendar tabs).
+const SLIDERS: { key: SliderKey; label: string; hint: string }[] = [
+  { key: "mood", label: "Mood", hint: "How you felt after the session" },
+  { key: "effort", label: "Session effort", hint: "How hard the session felt" },
+  { key: "performance", label: "How well did you play", hint: "Your performance rating" },
+];
+
 function phaseOf(question: JournalQuestionWithWorkoutType): PhaseChoice {
   return questionPhase(question) === "pre" ? "pre" : "post";
 }
@@ -54,6 +65,10 @@ export default function CustomizeQuestions() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  // Slider visibility state (mood / effort / performance score sliders)
+  const [hiddenSliders, setHiddenSliders] = useState<Set<string>>(new Set());
+  const [savingSlider, setSavingSlider] = useState<SliderKey | null>(null);
+
   // Add-question form state (one open at a time, keyed by workout type id or "general")
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [newPrompt, setNewPrompt] = useState("");
@@ -67,14 +82,16 @@ export default function CustomizeQuestions() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [fetchedTypes, fetchedQuestions, hiddenIds] = await Promise.all([
+      const [fetchedTypes, fetchedQuestions, hiddenIds, hiddenSliderKeys] = await Promise.all([
         getSystemWorkoutTypes(),
         getQuestionsWithWorkoutTypes(),
         getHiddenQuestionIds().catch(() => [] as string[]),
+        getHiddenSliderKeys().catch(() => new Set<string>()),
       ]);
       setTypes(fetchedTypes);
       setQuestions(fetchedQuestions);
       setHidden(new Set(hiddenIds));
+      setHiddenSliders(hiddenSliderKeys);
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Failed to load questions.");
     } finally {
@@ -144,6 +161,31 @@ export default function CustomizeQuestions() {
       }
     },
     [savingId, visibleOfType]
+  );
+
+  const handleSliderToggle = useCallback(
+    async (key: SliderKey, turnOn: boolean) => {
+      if (savingSlider) return;
+      try {
+        setSavingSlider(key);
+        if (turnOn) {
+          await unhideSlider(key);
+          setHiddenSliders((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        } else {
+          await hideSlider(key);
+          setHiddenSliders((prev) => new Set(prev).add(key));
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error?.message || "Failed to update slider.");
+      } finally {
+        setSavingSlider(null);
+      }
+    },
+    [savingSlider]
   );
 
   const handleSaveNew = useCallback(
@@ -281,6 +323,47 @@ export default function CustomizeQuestions() {
           Turn off any question to hide it from your journals. Add your own questions too.
           Hidden questions keep the answers you've already written.
         </Text>
+
+        <Section>
+          <SectionTitle>Sliders</SectionTitle>
+          <Card style={styles.card}>
+            <Text style={styles.slidersHint}>
+              Choose which score sliders appear in your journals. Hidden sliders also
+              disappear from the calendar, and any scores you already saved are kept.
+            </Text>
+            {SLIDERS.map((slider, index) => {
+              const isHidden = hiddenSliders.has(slider.key);
+              return (
+                <View
+                  key={slider.key}
+                  style={[
+                    styles.row,
+                    index < SLIDERS.length - 1 && styles.rowBorder,
+                    isHidden && styles.rowHidden,
+                  ]}
+                >
+                  <View style={styles.rowCopy}>
+                    <Text style={[styles.prompt, isHidden && styles.promptHidden]}>
+                      {slider.label}
+                    </Text>
+                    <Text style={typeStyles.caption}>{slider.hint}</Text>
+                  </View>
+                  {savingSlider === slider.key ? (
+                    <ActivityIndicator color={colors.accent} />
+                  ) : (
+                    <Switch
+                      value={!isHidden}
+                      onValueChange={(on) => handleSliderToggle(slider.key, on)}
+                      trackColor={{ false: colors.border, true: colors.accentStrong }}
+                      thumbColor={colors.white}
+                      accessibilityLabel={`Show "${slider.label}" slider`}
+                    />
+                  )}
+                </View>
+              );
+            })}
+          </Card>
+        </Section>
 
         {sections.map((section) => {
           const sectionQuestions = questionsFor(section.workoutTypeId);
@@ -474,6 +557,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.muted,
     marginBottom: space.md,
+  },
+  slidersHint: {
+    fontFamily: font,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.muted,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle,
   },
   card: { gap: 0 },
   row: {

@@ -17,6 +17,7 @@ export * from "./errors";
 export * from "./workoutTypes";
 export * from "./journalQuestions";
 export * from "./journalEntries";
+export * from "./sliderVisibility";
 export * from "./journalAnswers";
 export * from "./foodMeals";
 export * from "./profiles";

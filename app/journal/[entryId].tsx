@@ -12,16 +12,18 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   getEntryWithAnswers,
+  getHiddenSliderKeys,
   updateEntry,
   updateAnswer,
   getVisibleQuestionsByWorkoutType,
   createAnswers,
   deleteEntry,
+  type JournalEntryUpdate,
   type JournalEntryWithAnswers,
   type JournalQuestion,
 } from "../../src/api";
 import { TimeInput } from "../../src/components/TimeInput";
-import { MoodScoreInput, RpeInput } from "../../src/components/MoodScoreInput";
+import { MoodScoreInput, RpeInput, PerformanceInput } from "../../src/components/MoodScoreInput";
 import { QuestionsSection } from "../../src/components/QuestionsSection";
 import { AppButton, BottomNav, ButtonRow, PageHeader } from "../../src/components/AppChrome";
 import { colors, layout, space } from "../../src/theme";
@@ -56,6 +58,8 @@ export default function JournalEntryDetail() {
   const [answerTexts, setAnswerTexts] = useState<Record<string, string>>({});
   const [moodScore, setMoodScore] = useState<string>("");
   const [rpeScore, setRpeScore] = useState<number | null>(null);
+  const [performanceScore, setPerformanceScore] = useState<number | null>(null);
+  const [hiddenSliders, setHiddenSliders] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
   const [timeString, setTimeString] = useState<string>("");
   const [amPm, setAmPm] = useState<"AM" | "PM">("AM");
@@ -83,6 +87,7 @@ export default function JournalEntryDetail() {
       timeChanged ||
       moodScore.trim() !== (entry.mood_score == null ? "" : String(entry.mood_score)) ||
       rpeScore !== entry.rpe_score ||
+      performanceScore !== entry.performance_score ||
       notes.trim() !== (entry.notes ?? "").trim() ||
       answersChanged
     );
@@ -94,6 +99,7 @@ export default function JournalEntryDetail() {
     isFoodEntry,
     moodScore,
     notes,
+    performanceScore,
     questions,
     rpeScore,
     timeString,
@@ -110,7 +116,11 @@ export default function JournalEntryDetail() {
         setEntry(data);
         setMoodScore(data.mood_score != null ? String(data.mood_score) : "");
         setRpeScore(data.rpe_score);
+        setPerformanceScore(data.performance_score);
         setNotes(data.notes || "");
+        // Sliders the athlete hid in Settings > Journal questions
+        const hidden = await getHiddenSliderKeys().catch(() => new Set<string>());
+        setHiddenSliders(hidden);
 
         // Initialize time + AM/PM from stored 24h time
         if (data.entry_time) {
@@ -166,19 +176,24 @@ export default function JournalEntryDetail() {
         return;
       }
 
-      // Validate mood
+      // Validate mood (skipped when the athlete hid the mood slider in settings)
       const numericMood = validateMoodScore(moodScore);
-      if (numericMood === null) {
+      if (!hiddenSliders.has("mood") && numericMood === null) {
         Alert.alert("Error", "Mood score must be a number between 1 and 10");
         setSaving(false);
         return;
       }
 
+      // Hidden sliders keep their stored scores; only visible sliders are updated.
+      const scoreUpdates: JournalEntryUpdate = {};
+      if (!hiddenSliders.has("mood")) scoreUpdates.mood_score = numericMood ?? null;
+      if (!hiddenSliders.has("effort")) scoreUpdates.rpe_score = rpeScore;
+      if (!hiddenSliders.has("performance")) scoreUpdates.performance_score = performanceScore;
+
       await updateEntry(entry.id, {
         entry_time: normalizedTime,
-        mood_score: numericMood ?? null,
-        rpe_score: rpeScore,
         notes: notes.trim() || null,
+        ...scoreUpdates,
       });
 
       // Sync answers: update existing answers and create new ones for questions
@@ -303,11 +318,21 @@ export default function JournalEntryDetail() {
             />
           )}
 
-          <MoodScoreInput
-            moodScore={moodScore}
-            onMoodChange={setMoodScore}
-          />
-          {!isFoodEntry && <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />}
+          {!hiddenSliders.has("mood") && (
+            <MoodScoreInput
+              moodScore={moodScore}
+              onMoodChange={setMoodScore}
+            />
+          )}
+          {!isFoodEntry && !hiddenSliders.has("effort") && (
+            <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />
+          )}
+          {!isFoodEntry && !hiddenSliders.has("performance") && (
+            <PerformanceInput
+              performanceScore={performanceScore}
+              onPerformanceChange={setPerformanceScore}
+            />
+          )}
 
           {isPhasedEntry && !isFinishingPhase && hasPhasedQuestions ? (
             <>

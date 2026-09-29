@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,23 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { getDailyMoodAveragesForMonth, type DailyMoodAverage } from "../src/api";
+import { useRouter, useFocusEffect } from "expo-router";
+import {
+  getDailyScoreAveragesForMonth,
+  getHiddenSliderKeys,
+  type DailyScoreAverage,
+  type ScoreMetric,
+} from "../src/api";
 import { Page, PageHeader } from "../src/components/AppChrome";
 import { colors, radius } from "../src/theme";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const METRICS: { key: ScoreMetric; label: string; subtitle: string }[] = [
+  { key: "mood", label: "Mood", subtitle: "Mood by day" },
+  { key: "effort", label: "Effort", subtitle: "Effort by day" },
+  { key: "performance", label: "Performance", subtitle: "How you played, by day" },
+];
 
 function chunkWeeks(days: (number | null)[]): (number | null)[][] {
   const weeks: (number | null)[][] = [];
@@ -35,9 +46,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month - 1, 1).getDay();
 }
 
-function getMoodColor(averageMood: number | null): string {
-  if (averageMood === null) return colors.surface;
-
+function getMoodColor(averageMood: number): string {
   // Dark mood-tinted fills keep white date text readable.
 
   if (averageMood >= 1 && averageMood <= 5) {
@@ -55,12 +64,39 @@ function getMoodColor(averageMood: number | null): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function getEffortColor(averageEffort: number): string {
+  // Slate -> sky: rest to max effort. Dark fills keep white text readable.
+  const t = Math.min(1, Math.max(0, averageEffort / 10));
+  const r = Math.round(30 + (2 - 30) * t);
+  const g = Math.round(41 + (132 - 41) * t);
+  const b = Math.round(59 + (199 - 59) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getPerformanceColor(averagePerformance: number): string {
+  // Dark warm brown -> amber: rough to your best. Dark fills keep white text readable.
+  const t = Math.min(1, Math.max(0, (averagePerformance - 1) / 9));
+  const r = Math.round(120 + (217 - 120) * t);
+  const g = Math.round(53 + (119 - 53) * t);
+  const b = Math.round(15 + (6 - 15) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getScoreColor(metric: ScoreMetric, average: number | null): string {
+  if (average === null) return colors.surface;
+  if (metric === "effort") return getEffortColor(average);
+  if (metric === "performance") return getPerformanceColor(average);
+  return getMoodColor(average);
+}
+
 export default function CalendarScreen() {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [moodAverages, setMoodAverages] = useState<DailyMoodAverage[]>([]);
+  const [averages, setAverages] = useState<DailyScoreAverage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hiddenSliders, setHiddenSliders] = useState<Set<string> | null>(null);
+  const [metric, setMetric] = useState<ScoreMetric>("mood");
 
   // Animation values
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -72,20 +108,48 @@ export default function CalendarScreen() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1; // 1-12
 
+  const visibleMetrics = METRICS.filter(
+    (m) => hiddenSliders !== null && !hiddenSliders.has(m.key)
+  );
+  const activeMetric = METRICS.find((m) => m.key === metric) ?? METRICS[0];
+
+  // Reload slider visibility whenever the screen gains focus, so changes
+  // made in Settings > Journal questions are reflected immediately.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getHiddenSliderKeys()
+        .catch(() => new Set<string>())
+        .then((hidden) => {
+          if (cancelled) return;
+          setHiddenSliders(hidden);
+          const visible = METRICS.filter((m) => !hidden.has(m.key));
+          setMetric((current) =>
+            visible.some((m) => m.key === current)
+              ? current
+              : visible[0]?.key ?? "mood"
+          );
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   useEffect(() => {
-    const loadMoodAverages = async () => {
+    const loadAverages = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await getDailyMoodAveragesForMonth(year, month);
-        setMoodAverages(data);
-        
+        const data = await getDailyScoreAveragesForMonth(year, month, metric);
+        setAverages(data);
+
         // Reset animations
         headerOpacity.setValue(0);
         headerTranslateY.setValue(-20);
         calendarOpacity.setValue(0);
         calendarScale.setValue(0.95);
-        
+
         // Animate header
         Animated.parallel([
           Animated.timing(headerOpacity, {
@@ -122,12 +186,12 @@ export default function CalendarScreen() {
         const daysInMonth = getDaysInMonth(year, month);
         const firstDay = getFirstDayOfMonth(year, month);
         const totalCells = firstDay + daysInMonth;
-        
+
         // Ensure we have enough animation values
         while (dayAnimations.length < totalCells) {
           dayAnimations.push(new Animated.Value(0));
         }
-        
+
         // Reset all animations to 0
         dayAnimations.slice(0, totalCells).forEach((anim) => {
           anim.setValue(0);
@@ -149,16 +213,17 @@ export default function CalendarScreen() {
           ).start();
         }
       } catch (err: any) {
-        setError(err?.message || "Failed to load mood data");
+        setError(err?.message || "Failed to load calendar data");
       } finally {
         setLoading(false);
       }
     };
 
-    loadMoodAverages();
+    loadAverages();
   }, [
     year,
     month,
+    metric,
     calendarOpacity,
     calendarScale,
     dayAnimations,
@@ -174,10 +239,10 @@ export default function CalendarScreen() {
     setCurrentDate(new Date(year, month, 1));
   };
 
-  const getMoodForDate = (date: number): number | null => {
+  const getScoreForDate = (date: number): number | null => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(date).padStart(2, "0")}`;
-    const found = moodAverages.find((avg) => avg.date === dateStr);
-    return found?.average_mood ?? null;
+    const found = averages.find((avg) => avg.date === dateStr);
+    return found?.average ?? null;
   };
 
   const daysInMonth = getDaysInMonth(year, month);
@@ -207,7 +272,7 @@ export default function CalendarScreen() {
 
   return (
     <Page>
-      <PageHeader title="Calendar" subtitle="Mood by day" onBack={() => router.back()} />
+      <PageHeader title="Calendar" subtitle={activeMetric.subtitle} onBack={() => router.back()} />
       <Animated.View
         style={[
           styles.headerRow,
@@ -228,7 +293,34 @@ export default function CalendarScreen() {
         </View>
       </Animated.View>
 
-      {loading ? (
+      {visibleMetrics.length > 1 && (
+        <View style={styles.tabBar}>
+          {visibleMetrics.map((m) => {
+            const isActive = metric === m.key;
+            return (
+              <TouchableOpacity
+                key={m.key}
+                style={[styles.tab, isActive && styles.tabActive]}
+                onPress={() => setMetric(m.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {hiddenSliders !== null && visibleMetrics.length === 0 ? (
+        <View style={styles.centerContent}>
+          <Text style={styles.emptyText}>
+            All score sliders are hidden. Turn them back on in Settings → Journal
+            questions to see your calendar.
+          </Text>
+        </View>
+      ) : loading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -243,7 +335,7 @@ export default function CalendarScreen() {
             transform: [{ scale: calendarScale }],
           }}
         >
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
@@ -304,8 +396,8 @@ export default function CalendarScreen() {
                       );
                     }
 
-                    const mood = getMoodForDate(day);
-                    const color = getMoodColor(mood);
+                    const score = getScoreForDate(day);
+                    const color = getScoreColor(metric, score);
                     const now = new Date();
                     const isToday =
                       day === now.getDate() &&
@@ -329,29 +421,29 @@ export default function CalendarScreen() {
                             ],
                           },
                         ]}
-                      >
-                        <TouchableOpacity
-                          style={[styles.dayCell, { backgroundColor: color }]}
-                          onPress={() => handleDayPress(day)}
-                          activeOpacity={0.7}
                         >
-                          <Text
-                            style={[
-                              styles.dayText,
-                              isToday && styles.todayText,
-                              mood === null && styles.noDataText,
-                            ]}
+                          <TouchableOpacity
+                            style={[styles.dayCell, { backgroundColor: color }]}
+                            onPress={() => handleDayPress(day)}
+                            activeOpacity={0.7}
                           >
-                            {day}
-                          </Text>
-                          {mood !== null && (
-                            <Text style={styles.moodIndicator}>{mood.toFixed(1)}</Text>
-                          )}
-                        </TouchableOpacity>
-                      </Animated.View>
-                    );
-                  })}
-                </View>
+                            <Text
+                              style={[
+                                styles.dayText,
+                                isToday && styles.todayText,
+                                score === null && styles.noDataText,
+                              ]}
+                            >
+                              {day}
+                            </Text>
+                            {score !== null && (
+                              <Text style={styles.scoreIndicator}>{score.toFixed(1)}</Text>
+                            )}
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })}
+                  </View>
               ))}
             </View>
           </ScrollView>
@@ -366,7 +458,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 28,
+    marginBottom: 16,
   },
   monthHeader: {
     flexDirection: "row",
@@ -395,14 +487,47 @@ const styles = StyleSheet.create({
     minWidth: 180,
     textAlign: "center",
   },
+  tabBar: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
+  tabActive: {
+    backgroundColor: colors.accentSolid,
+    borderColor: colors.accentSolid,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.muted,
+  },
+  tabTextActive: {
+    color: colors.white,
+  },
   centerContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 32,
   },
   errorText: {
     color: colors.danger,
     fontSize: 14,
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
   },
   scrollContent: {
     paddingBottom: 32,
@@ -462,7 +587,7 @@ const styles = StyleSheet.create({
   noDataText: {
     color: colors.faint,
   },
-  moodIndicator: {
+  scoreIndicator: {
     fontSize: 9,
     fontWeight: "500",
     color: colors.white,

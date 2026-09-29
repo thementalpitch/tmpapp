@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   getWorkoutTypes,
   getVisibleQuestionsByWorkoutType,
+  getHiddenSliderKeys,
   createEntry,
   createAnswers,
   updateEntry,
@@ -24,7 +25,7 @@ import {
   type MealType,
 } from "../../src/api";
 import { TimeInput } from "../../src/components/TimeInput";
-import { MoodScoreInput, RpeInput } from "../../src/components/MoodScoreInput";
+import { MoodScoreInput, RpeInput, PerformanceInput } from "../../src/components/MoodScoreInput";
 import { QuestionsSection } from "../../src/components/QuestionsSection";
 import { AppButton, BottomNav, FormSection, PageHeader, PressableCard } from "../../src/components/AppChrome";
 import { OtherNotes } from "../../src/components/OtherNotes";
@@ -50,6 +51,8 @@ export default function NewJournalEntryScreen() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [moodScore, setMoodScore] = useState<string>("");
   const [rpeScore, setRpeScore] = useState<number | null>(null);
+  const [performanceScore, setPerformanceScore] = useState<number | null>(null);
+  const [hiddenSliders, setHiddenSliders] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
   const [amPm, setAmPm] = useState<"AM" | "PM">("AM");
   const [timeString, setTimeString] = useState<string>("");
@@ -71,6 +74,9 @@ export default function NewJournalEntryScreen() {
         // Only show system defaults for now to keep list concise
         const systemTypes = types.filter((t) => t.is_system_default);
         setWorkoutTypes(systemTypes);
+        // Sliders the athlete hid in Settings > Journal questions
+        const hidden = await getHiddenSliderKeys().catch(() => new Set<string>());
+        setHiddenSliders(hidden);
       } catch (err: any) {
         Alert.alert("Error", err?.message || "Failed to load workout types");
       } finally {
@@ -88,6 +94,7 @@ export default function NewJournalEntryScreen() {
       setNotes("");
       setMoodScore("");
       setRpeScore(null);
+      setPerformanceScore(null);
       setTimeString("");
 
       const isFood =
@@ -140,8 +147,9 @@ export default function NewJournalEntryScreen() {
       const isPhasedStart = isPhasedJournalName(selectedType.name);
 
       // Validate mood after the session, not during a pre-session journal.
+      // Skipped when the athlete hid the mood slider in settings.
       const numericMood = validateMoodScore(moodScore);
-      if (!isPhasedStart && numericMood === null) {
+      if (!isPhasedStart && !hiddenSliders.has("mood") && numericMood === null) {
         Alert.alert("Error", "Please enter your mood score (1-10) before saving.");
         setSaving(false);
         return;
@@ -203,8 +211,12 @@ export default function NewJournalEntryScreen() {
         }
       }
 
-      if (numericMood !== null || rpeScore !== null) {
-        await updateEntry(entry.id, { mood_score: numericMood, rpe_score: rpeScore });
+      if (numericMood !== null || rpeScore !== null || performanceScore !== null) {
+        await updateEntry(entry.id, {
+          mood_score: numericMood,
+          rpe_score: rpeScore,
+          performance_score: performanceScore,
+        });
       }
 
       const phaseLabels = getPhaseLabels(selectedType.name);
@@ -294,12 +306,22 @@ export default function NewJournalEntryScreen() {
 
               {!isPhasedType && (
                 <>
-                  <MoodScoreInput
-                    moodScore={moodScore}
-                    onMoodChange={setMoodScore}
-                    isFoodType={isFoodType}
-                  />
-                  {!isFoodType && <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />}
+                  {!hiddenSliders.has("mood") && (
+                    <MoodScoreInput
+                      moodScore={moodScore}
+                      onMoodChange={setMoodScore}
+                      isFoodType={isFoodType}
+                    />
+                  )}
+                  {!isFoodType && !hiddenSliders.has("effort") && (
+                    <RpeInput rpeScore={rpeScore} onRpeChange={setRpeScore} />
+                  )}
+                  {!isFoodType && !hiddenSliders.has("performance") && (
+                    <PerformanceInput
+                      performanceScore={performanceScore}
+                      onPerformanceChange={setPerformanceScore}
+                    />
+                  )}
                 </>
               )}
 

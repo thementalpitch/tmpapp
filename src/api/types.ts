@@ -93,6 +93,7 @@ export interface JournalEntry {
   notes: string | null;
   mood_score: number | null; // 1-10
   rpe_score: number | null; // 0-10
+  performance_score: number | null; // 1-10
   created_at: string;
   updated_at: string;
 }
@@ -106,6 +107,7 @@ export interface JournalEntryInsert {
   notes?: string | null;
   mood_score?: number | null; // 1-10
   rpe_score?: number | null; // 0-10
+  performance_score?: number | null; // 1-10
 }
 
 export interface JournalEntryUpdate {
@@ -116,6 +118,7 @@ export interface JournalEntryUpdate {
   notes?: string | null;
   mood_score?: number | null; // 1-10
   rpe_score?: number | null; // 0-10
+  performance_score?: number | null; // 1-10
 }
 
 // ============================================================================

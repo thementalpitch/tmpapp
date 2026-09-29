@@ -99,6 +99,26 @@ export function RpeInput({
   );
 }
 
+export function PerformanceInput({
+  performanceScore,
+  onPerformanceChange,
+}: {
+  performanceScore: number | null;
+  onPerformanceChange: (score: number) => void;
+}) {
+  return (
+    <ScoreSlider
+      title="How well did you play?"
+      hint="1 is rough, 10 is your best."
+      value={performanceScore}
+      minimumValue={1}
+      lowLabel="Rough"
+      highLabel="Best"
+      onChange={onPerformanceChange}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: colors.surface,

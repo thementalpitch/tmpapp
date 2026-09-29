@@ -183,16 +183,36 @@ export async function getAverageMoodForDay(
 }
 
 /**
- * Get average mood scores for each day in a given month.
+ * Which journal score a calendar tab (or chart) is showing.
+ * - mood: mood_score (1-10)
+ * - effort: rpe_score (0-10)
+ * - performance: performance_score (1-10)
+ */
+export type ScoreMetric = "mood" | "effort" | "performance";
+
+const SCORE_COLUMNS: Record<ScoreMetric, "mood_score" | "rpe_score" | "performance_score"> = {
+  mood: "mood_score",
+  effort: "rpe_score",
+  performance: "performance_score",
+};
+
+export interface DailyScoreAverage {
+  date: string; // ISO 8601 date (YYYY-MM-DD)
+  average: number | null;
+}
+
+/**
+ * Get average scores for each day in a given month, for one score metric.
  *
  * Architecture Notes:
- * - Returns one record per calendar day that has at least one mood score.
- * - Useful for plotting mood over time in charts.
+ * - Returns one record per calendar day that has at least one score.
+ * - Implemented in application code to keep SQL simple and portable.
  */
-export async function getDailyMoodAveragesForMonth(
+export async function getDailyScoreAveragesForMonth(
   year: number,
-  month: number // 1-12 (calendar month)
-): Promise<DailyMoodAverage[]> {
+  month: number, // 1-12 (calendar month)
+  metric: ScoreMetric
+): Promise<DailyScoreAverage[]> {
   // Compute ISO date range for the month
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0); // last day of month
@@ -201,28 +221,45 @@ export async function getDailyMoodAveragesForMonth(
   const endDate = toISODateLocal(end);
 
   const entries = await getEntriesByDateRange(startDate, endDate);
+  const column = SCORE_COLUMNS[metric];
 
   const byDate: Record<string, number[]> = {};
   for (const entry of entries) {
-    if (entry.mood_score == null) continue;
+    const score = entry[column];
+    if (score == null) continue;
     if (!byDate[entry.entry_date]) {
       byDate[entry.entry_date] = [];
     }
-    byDate[entry.entry_date].push(entry.mood_score);
+    byDate[entry.entry_date].push(score);
   }
 
   const dates = Object.keys(byDate).sort();
 
-  const result: DailyMoodAverage[] = dates.map((dateKey) => {
+  return dates.map((dateKey) => {
     const scores = byDate[dateKey];
     if (!scores || scores.length === 0) {
-      return { date: dateKey, average_mood: null };
+      return { date: dateKey, average: null };
     }
     const sum = scores.reduce((acc, value) => acc + value, 0);
-    return { date: dateKey, average_mood: sum / scores.length };
+    return { date: dateKey, average: sum / scores.length };
   });
+}
 
-  return result;
+/**
+ * Get average mood scores for each day in a given month.
+ *
+ * Architecture Notes:
+ * - Returns one record per calendar day that has at least one mood score.
+ * - Useful for plotting mood over time in charts.
+ * - Kept as a thin wrapper for existing callers; new code should use
+ *   getDailyScoreAveragesForMonth.
+ */
+export async function getDailyMoodAveragesForMonth(
+  year: number,
+  month: number // 1-12 (calendar month)
+): Promise<DailyMoodAverage[]> {
+  const rows = await getDailyScoreAveragesForMonth(year, month, "mood");
+  return rows.map((row) => ({ date: row.date, average_mood: row.average }));
 }
 
 /**
@@ -323,6 +360,7 @@ export async function createEntry(
 
   validateRating(input.mood_score, "mood_score", 1);
   validateRating(input.rpe_score, "rpe_score", 0);
+  validateRating(input.performance_score, "performance_score", 1);
 
   const { data, error } = await supabase
     .from("journal_entries")
@@ -354,6 +392,7 @@ export async function updateEntry(
 
   validateRating(input.mood_score, "mood_score", 1);
   validateRating(input.rpe_score, "rpe_score", 0);
+  validateRating(input.performance_score, "performance_score", 1);
 
   const { data, error } = await supabase
     .from("journal_entries")
