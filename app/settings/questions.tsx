@@ -47,7 +47,7 @@ type PhaseChoice = "pre" | "post";
 // The three score sliders that appear on journal entries (and as calendar tabs).
 const SLIDERS: { key: SliderKey; label: string; hint: string }[] = [
   { key: "mood", label: "Mood", hint: "How you felt after the session" },
-  { key: "effort", label: "Session effort", hint: "How hard the session felt" },
+  { key: "effort", label: "Session intensity", hint: "How hard the session felt" },
   { key: "performance", label: "How well did you play", hint: "Your performance rating" },
 ];
 
@@ -65,7 +65,7 @@ export default function CustomizeQuestions() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // Slider visibility state (mood / effort / performance score sliders)
+  // Slider visibility state (mood / intensity / performance score sliders)
   const [hiddenSliders, setHiddenSliders] = useState<Set<string>>(new Set());
   const [savingSlider, setSavingSlider] = useState<SliderKey | null>(null);
 
