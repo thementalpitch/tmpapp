@@ -185,7 +185,7 @@ export async function getAverageMoodForDay(
 /**
  * Which journal score a calendar tab (or chart) is showing.
  * - mood: mood_score (1-10)
- * - effort: rpe_score (0-10)
+ * - intensity (key "effort"): rpe_score (0-10)
  * - performance: performance_score (1-10)
  */
 export type ScoreMetric = "mood" | "effort" | "performance";
