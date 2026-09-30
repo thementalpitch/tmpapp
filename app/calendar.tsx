@@ -17,6 +17,11 @@ import {
 } from "../src/api";
 import { Page, PageHeader } from "../src/components/AppChrome";
 import { colors, radius } from "../src/theme";
+import {
+  moodScoreColor,
+  intensityScoreColor,
+  performanceScoreColor,
+} from "../src/utils/scoreColors";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -47,48 +52,18 @@ function getFirstDayOfMonth(year: number, month: number): number {
 }
 
 function getMoodColor(averageMood: number): string {
-  // Dark mood-tinted fills keep white date text readable.
-
-  if (averageMood >= 1 && averageMood <= 5) {
-    const t = (averageMood - 1) / 4;
-    const r = Math.round(127 + (133 - 127) * t);
-    const g = Math.round(29 + (77 - 29) * t);
-    const b = Math.round(29 + (14 - 29) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  const t = (averageMood - 5) / 5;
-  const r = Math.round(133 + (20 - 133) * t);
-  const g = Math.round(77 + (83 - 77) * t);
-  const b = Math.round(14 + (45 - 14) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  // Shared 5-stop scale (dark red -> bright green); see src/utils/scoreColors.
+  return moodScoreColor(averageMood);
 }
 
 function getIntensityColor(averageIntensity: number): string {
-  // Slate -> sky: rest to max intensity. Dark fills keep white text readable.
-  const t = Math.min(1, Math.max(0, averageIntensity / 10));
-  const r = Math.round(30 + (2 - 30) * t);
-  const g = Math.round(41 + (132 - 41) * t);
-  const b = Math.round(59 + (199 - 59) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  // Shared 5-stop scale (dark red -> bright green); see src/utils/scoreColors.
+  return intensityScoreColor(averageIntensity);
 }
 
 function getPerformanceColor(averagePerformance: number): string {
-  // Red -> amber -> green: rough to your best. Dark fills keep white text readable.
-  // (Previously brown -> amber, which topped out at orange -- an 8 looked "average".)
-  if (averagePerformance >= 1 && averagePerformance <= 5) {
-    const t = (averagePerformance - 1) / 4;
-    const r = Math.round(153 + (217 - 153) * t);
-    const g = Math.round(27 + (119 - 27) * t);
-    const b = Math.round(27 + (6 - 27) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  const t = Math.min(1, Math.max(0, (averagePerformance - 5) / 5));
-  const r = Math.round(217 + (22 - 217) * t);
-  const g = Math.round(119 + (163 - 119) * t);
-  const b = Math.round(6 + (74 - 6) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  // Shared 5-stop scale (dark red -> bright green); see src/utils/scoreColors.
+  return performanceScoreColor(averagePerformance);
 }
 
 function getScoreColor(metric: ScoreMetric, average: number | null): string {
