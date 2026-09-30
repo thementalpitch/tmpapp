@@ -22,7 +22,7 @@ const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const METRICS: { key: ScoreMetric; label: string; subtitle: string }[] = [
   { key: "mood", label: "Mood", subtitle: "Mood by day" },
-  { key: "effort", label: "Effort", subtitle: "Effort by day" },
+  { key: "effort", label: "Intensity", subtitle: "Intensity by day" },
   { key: "performance", label: "Performance", subtitle: "How you played, by day" },
 ];
 
@@ -64,9 +64,9 @@ function getMoodColor(averageMood: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function getEffortColor(averageEffort: number): string {
-  // Slate -> sky: rest to max effort. Dark fills keep white text readable.
-  const t = Math.min(1, Math.max(0, averageEffort / 10));
+function getIntensityColor(averageIntensity: number): string {
+  // Slate -> sky: rest to max intensity. Dark fills keep white text readable.
+  const t = Math.min(1, Math.max(0, averageIntensity / 10));
   const r = Math.round(30 + (2 - 30) * t);
   const g = Math.round(41 + (132 - 41) * t);
   const b = Math.round(59 + (199 - 59) * t);
@@ -84,7 +84,7 @@ function getPerformanceColor(averagePerformance: number): string {
 
 function getScoreColor(metric: ScoreMetric, average: number | null): string {
   if (average === null) return colors.surface;
-  if (metric === "effort") return getEffortColor(average);
+  if (metric === "effort") return getIntensityColor(average);
   if (metric === "performance") return getPerformanceColor(average);
   return getMoodColor(average);
 }
