@@ -3,7 +3,7 @@
  *
  * Architecture Notes:
  * - Domain: per-user visibility of the three journal score sliders
- *   (mood, effort, performance). Mirrors user_hidden_questions.
+ *   (mood, intensity, performance). Mirrors user_hidden_questions.
  * - RLS: users can only read/write their own rows.
  * - Hiding a slider removes it from the journal entry form (new + edit)
  *   and removes its tab from the calendar. Scores already saved are
@@ -19,7 +19,7 @@ export const SLIDER_KEYS: SliderKey[] = ["mood", "effort", "performance"];
 
 export const SLIDER_LABELS: Record<SliderKey, string> = {
   mood: "Mood",
-  effort: "Session effort",
+  effort: "Session intensity",
   performance: "How well did you play",
 };
 
