@@ -189,7 +189,7 @@ export interface Profile {
 }
 
 export interface ProfileInsert {
-  id: UUID; // must match auth.users.id
+  id?: UUID; // filled from auth.users.id by createProfile/upsertProfile when omitted
   first_name?: string | null;
   last_name?: string | null;
   preferred_sport?: string | null;

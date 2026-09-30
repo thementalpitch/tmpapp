@@ -3,30 +3,13 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from "reac
 import type { Profile, ProfileUpdate } from "../api/types";
 import { AppButton, FormSection } from "./AppChrome";
 import { colors, font, input, radius, space, type as typeStyles } from "../theme";
+import { SPORTS, POSITIONS } from "../utils/sports";
 
 interface EditProfileFormProps {
   profile: Profile | null;
   onSave: (updates: ProfileUpdate) => Promise<void>;
   onCancel: () => void;
 }
-
-const SPORTS = [
-  "Soccer", "Basketball", "Baseball", "Football", "Tennis",
-  "Swimming", "Track & Field", "Volleyball", "Golf", "Other",
-];
-
-const POSITIONS: Record<string, string[]> = {
-  Soccer: ["Goalkeeper", "Defender", "Midfielder", "Forward"],
-  Basketball: ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"],
-  Baseball: ["Pitcher", "Catcher", "First Base", "Second Base", "Third Base", "Shortstop", "Outfield"],
-  Football: ["Quarterback", "Running Back", "Wide Receiver", "Tight End", "Offensive Line", "Defensive Line", "Linebacker", "Cornerback", "Safety"],
-  Tennis: ["Singles", "Doubles"],
-  Swimming: ["Freestyle", "Backstroke", "Breaststroke", "Butterfly"],
-  "Track & Field": ["Sprints", "Distance", "Jumps", "Throws"],
-  Volleyball: ["Setter", "Outside Hitter", "Middle Blocker", "Opposite", "Libero"],
-  Golf: ["Player"],
-  Other: ["Player"],
-};
 
 export function EditProfileForm({ profile, onSave, onCancel }: EditProfileFormProps) {
   const [firstName, setFirstName] = useState(profile?.first_name || "");
