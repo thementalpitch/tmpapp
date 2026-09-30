@@ -88,7 +88,7 @@ export function RpeInput({
 }) {
   return (
     <ScoreSlider
-      title="Session intensity"
+      title="Session intensity (RPE)"
       hint="How hard did this session feel?"
       value={rpeScore}
       minimumValue={0}
