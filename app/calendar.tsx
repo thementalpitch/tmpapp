@@ -74,11 +74,20 @@ function getIntensityColor(averageIntensity: number): string {
 }
 
 function getPerformanceColor(averagePerformance: number): string {
-  // Dark warm brown -> amber: rough to your best. Dark fills keep white text readable.
-  const t = Math.min(1, Math.max(0, (averagePerformance - 1) / 9));
-  const r = Math.round(120 + (217 - 120) * t);
-  const g = Math.round(53 + (119 - 53) * t);
-  const b = Math.round(15 + (6 - 15) * t);
+  // Red -> amber -> green: rough to your best. Dark fills keep white text readable.
+  // (Previously brown -> amber, which topped out at orange -- an 8 looked "average".)
+  if (averagePerformance >= 1 && averagePerformance <= 5) {
+    const t = (averagePerformance - 1) / 4;
+    const r = Math.round(153 + (217 - 153) * t);
+    const g = Math.round(27 + (119 - 27) * t);
+    const b = Math.round(27 + (6 - 27) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  const t = Math.min(1, Math.max(0, (averagePerformance - 5) / 5));
+  const r = Math.round(217 + (22 - 217) * t);
+  const g = Math.round(119 + (163 - 119) * t);
+  const b = Math.round(6 + (74 - 6) * t);
   return `rgb(${r}, ${g}, ${b})`;
 }
 
