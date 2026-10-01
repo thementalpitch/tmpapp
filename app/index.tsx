@@ -1,4 +1,4 @@
-import { View, StyleSheet, Text, Animated, Image, ScrollView } from "react-native";
+import { View, StyleSheet, Text, Animated, ScrollView } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,12 +15,13 @@ import { openOnrise } from "../src/utils/onrise";
 
 const LOGO_SIZE = 132;
 
-const menuItems: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; path: Href }[] = [
+const menuItems: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; path?: Href; action?: () => void }[] = [
   { label: "Stats", icon: "bar-chart-outline", path: "/stats" },
   { label: "Calendar", icon: "calendar-outline", path: "/calendar" },
   { label: "Profile", icon: "person-outline", path: "/profile" },
   { label: "Settings", icon: "settings-outline", path: "/settings" },
   { label: "Tutorial", icon: "school-outline", path: "/tutorial" },
+  { label: "Onrise", icon: "people-outline", action: openOnrise },
 ];
 
 export default function Index() {
@@ -95,27 +96,13 @@ export default function Index() {
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
-                onPress={() => router.push(item.path)}
+                onPress={() => (item.action ? item.action() : item.path ? router.push(item.path) : undefined)}
                 border={index < menuItems.length - 1}
               />
             ))}
           </ListGroup>
 
-          <View style={styles.onriseSection}>
-            <Image
-              source={require("../assets/images/company_logo.png")}
-              style={styles.onriseLogo}
-              resizeMode="contain"
-              accessibilityLabel="Onrise"
-            />
-            <AppButton
-              label="Book with Onrise"
-              icon="open-outline"
-              variant="secondary"
-              onPress={openOnrise}
-            />
-            <Text style={styles.onriseBlurb}>Onrise — Peer support and Clinical support</Text>
-          </View>
+          <Text style={styles.onriseBlurb}>Onrise — Peer support and Clinical support</Text>
         </Animated.View>
       </ScrollView>
     </View>
@@ -136,8 +123,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 280,
   },
-  onriseSection: { alignItems: "center", gap: 12, paddingTop: 4 },
-  onriseLogo: { width: 132, height: 58 },
   onriseBlurb: {
     fontFamily: font,
     fontSize: 13,
@@ -145,5 +130,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: "center",
     maxWidth: 280,
+    alignSelf: "center",
   },
 });
