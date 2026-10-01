@@ -114,6 +114,7 @@ export default function Index() {
               variant="secondary"
               onPress={openOnrise}
             />
+            <Text style={styles.onriseBlurb}>Onrise — Peer support and Clinical support</Text>
           </View>
         </Animated.View>
       </ScrollView>
@@ -137,4 +138,12 @@ const styles = StyleSheet.create({
   },
   onriseSection: { alignItems: "center", gap: 12, paddingTop: 4 },
   onriseLogo: { width: 132, height: 58 },
+  onriseBlurb: {
+    fontFamily: font,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.muted,
+    textAlign: "center",
+    maxWidth: 280,
+  },
 });
